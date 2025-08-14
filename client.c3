@@ -53,12 +53,6 @@ fn void? post(String input, String body, String accept=ContentType.JSON.str, Str
     tora::debug("%s", buf);
 }
 
-// TODO: This is what gets sent - Fix up the serialize function, maybe skip that has "".
-// 0000: GET / HTTP/1.1
-// 0010: Host: echo.free.beeceptor.com
-// 002f: User-Agent: curl/8.12.1
-// 0048: Accept: */*
-
 fn Response? get(String input, String accept=ContentType.ANY.str, String lang=Language.EN_US.str, String encoding = AcceptEncoding.GZIP.str, String content_type = ContentType.JSON.str)
 {
     Url url = url::tparse(input)!;
