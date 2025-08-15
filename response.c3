@@ -149,12 +149,12 @@ fn void? Response.recv(&self, InStream socket)
         // MAYBE THIS SHOULD BE A FAILED READ?
         if (bytes_read == 0) return;
 
-        String read_bytes = (String) buf[0..bytes_read];
+        String bytes = (String) buf[0..bytes_read];
 
         // TODO: This is a DDOS vector
-        if (!read_bytes.contains(CLRF)) continue;
+        if (!bytes.contains(CLRF)) continue;
 
-        self.read_headers(read_bytes.tsplit(CLRF)[0]);
+        self.read_headers(bytes.tsplit(CLRF)[0]);
         headers_parsed = true;
     }
 
