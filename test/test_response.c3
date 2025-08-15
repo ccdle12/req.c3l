@@ -2,33 +2,7 @@ module req;
 
 import tora;
 
-fn void test_deserialize_response() @test
-{
-    // Creating this as an array, simply to make each line more readable.
-    String[*] input =
-    {
-      "HTTP/1.1 400 Bad Request \r\n",
-      "Content-Type: text/plain; charset=utf-8 \r\n",
-      "Connection: close \r\n",
-
-      // Headers and Body separator
-      "\r\n\r\n",
-
-      "400 Bad Request \r\n"
-
-      "0\r\n\r\n",
-    };
-
-    Response response = get_response(&input);
-
-    test::eq(response.version, Version.HTTP1_1.str);
-    test::eq(response.status, "400");
-    test::eq(response.headers.connection, "close");
-    test::@check(response.body.contains("400 bad request"));
-}
-
-
-fn void test_deserialize_ok_response() @test
+fn void test_ok_0() @test
 {
     String[*] input =
     {
@@ -39,11 +13,12 @@ fn void test_deserialize_ok_response() @test
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n",
         "Server: nginx/1.18.0 \r\n",
 
-          // Headers and Body separator
-          "\r\n\r\n",
+        // Headers and Body separator
+        CLRF,
 
         "{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}",
-        "0\r\n\r\n",
+
+        CLRF_END,
     };
 
     Response response = get_response(&input);
@@ -57,11 +32,54 @@ fn void test_deserialize_ok_response() @test
     test::eq(response.headers.server, "nginx/1.18.0");
     test::@check(response.body.contains("success"));
     test::@check(response.body.contains("}"));
-
-
 }
 
-fn void test_deserialize_internal_error() @test
+fn void test_ok_1() @test
+{
+    String[*] input =
+    {
+      "HTTP/1.1 200 OK \r\n",
+      "Content-Type: application/json \r\n",
+      "Date: Fri, 15 Aug 2025 16:59:17 GMT \r\n",
+      "Vary: Accept-Encoding \r\n",
+      "Via: 1.1 Caddy \r\n",
+      "Transfer-Encoding: chunked \r\n",
+
+      // Headers and Body separator
+      CLRF,
+
+      // Chunk Length
+      "141\n",
+      "{\n",
+          "\"method\": \"GET\" \n",
+          "\"protocol\": \"http\" \n",
+          "\"host\": \"echo.free.beeceptor.com\" \n",
+          "\"path\": \"/\" \n",
+          "\"ip\": \"213.22.219.242:35126\" \n",
+          "\"headers\": { \n",
+          "\"Host\": \"echo.free.beeceptor.com\" \n",
+          "\"User-Agent\": \"curl/8.12.1\" \n",
+          "\"Accept\": \"*/*\" \n",
+          "\"Via\": \"1.1 Caddy\" \n",
+          "\"Accept-Encoding\": \"gzip\" \n",
+       "}\n",
+       "\"parsedQueryParams\": {} \n",
+      CLRF_END,
+    };
+
+    // Then i'll need to figure out how to call recv(), that has incomplete
+    // mock socket and then add more to the mock socket somehow
+
+    Response res = get_response(&input);
+
+    test::eq(res.status, "200");
+    test::eq(res.version, "HTTP/1.1");
+    test::eq(res.headers.transfer_encoding, CHUNKED_ENCODING);
+    test::eq(res.headers.via, "1.1 Caddy");
+    test::@check(res.body.contains("parsedQueryParams"));
+}
+
+fn void test_internal_error_0() @test
 {
     String[*] input =
     {
@@ -73,10 +91,11 @@ fn void test_deserialize_internal_error() @test
         "Server: nginx/1.18.0 \r\n",
 
         // Headers and Body separator
-        "\r\n\r\n",
+        CLRF,
 
         "{\"error\": \"Internal Server Error\",\"message\": \"Something went wrong\"}",
-        "0\r\n\r\n",
+
+        CLRF_END
     };
 
     Response response = get_response(&input);
@@ -92,7 +111,7 @@ fn void test_deserialize_internal_error() @test
     test::@check(response.body.contains("}"));
 }
 
-fn void test_deserialize_response_via() @test
+fn void test_headers_via() @test
 {
     String[*] input =
     {
@@ -103,11 +122,13 @@ fn void test_deserialize_response_via() @test
         "Vary: Accept-Encoding\r\n",
         "Via: 1.1 Caddy\r\n",
         "Transfer-Encoding: chunked\r\n",
-        "\r\n\r\n",
+
+        CLRF,
 
         "1",
         "{",
-        "0\r\n\r\n"
+
+        CLRF_END,
     };
 
     Response response = get_response(&input);
@@ -118,13 +139,55 @@ fn void test_deserialize_response_via() @test
 
 }
 
+fn void test_bad_request_0() @test
+{
+    String[*] input =
+    {
+      "HTTP/1.1 400 Bad Request \r\n",
+      "Content-Type: text/plain; charset=utf-8 \r\n",
+      "Content-Length: 16\r\n",
+      "Connection: close \r\n",
+
+      // Headers and Body separator
+      CLRF,
+
+      "400 Bad Request \r\n",
+
+      CLRF_END,
+    };
+
+    Response res = get_response(&input);
+
+    test::eq(res.version, Version.HTTP1_1.str);
+    test::eq(res.status, "400");
+    test::eq(res.headers.connection, "close");
+    test::@check(res.headers.content_type.contains("text/plain"));
+    test::@check(res.body.contains("400 Bad Request"));
+}
+
+fn void test_empty_request() @test
+{
+    String[*] input =
+    {
+      "",
+    };
+
+    Response res = get_response(&input);
+    test::eq(res.version, "");
+    test::eq(res.status, "");
+    test::eq(res.headers.connection, "");
+    test::eq(res.body, "");
+}
+
 fn Response get_response(String[] input)
 {
     DString in = dstring::temp();
     foreach (&str : input) in.appendf(*str);
 
-    Response response;
-    response.deserialize(in.str_view());
+    MockSocket soc = { .buf = in.str_view() };
 
-    return response;
+    Response res;
+    res.recv(&soc)!!;
+
+    return res;
 }
