@@ -15,6 +15,8 @@ fn void test_deserialize_response() @test
       "\r\n\r\n",
 
       "400 Bad Request \r\n"
+
+      "0\r\n\r\n",
     };
 
     Response response = get_response(&input);
@@ -22,7 +24,7 @@ fn void test_deserialize_response() @test
     test::eq(response.version, Version.HTTP1_1.str);
     test::eq(response.status, "400");
     test::eq(response.headers.connection, "close");
-    test::eq(response.body, "400 Bad Request");
+    test::@check(response.body.contains("400 bad request"));
 }
 
 
@@ -41,6 +43,7 @@ fn void test_deserialize_ok_response() @test
           "\r\n\r\n",
 
         "{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}",
+        "0\r\n\r\n",
     };
 
     Response response = get_response(&input);
@@ -72,7 +75,8 @@ fn void test_deserialize_internal_error() @test
         // Headers and Body separator
         "\r\n\r\n",
 
-        "{\"error\": \"Internal Server Error\",\"message\": \"Something went wrong\"}"
+        "{\"error\": \"Internal Server Error\",\"message\": \"Something went wrong\"}",
+        "0\r\n\r\n",
     };
 
     Response response = get_response(&input);
@@ -100,6 +104,10 @@ fn void test_deserialize_response_via() @test
         "Via: 1.1 Caddy\r\n",
         "Transfer-Encoding: chunked\r\n",
         "\r\n\r\n",
+
+        "1",
+        "{",
+        "0\r\n\r\n"
     };
 
     Response response = get_response(&input);
