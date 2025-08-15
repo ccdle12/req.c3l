@@ -72,7 +72,7 @@ fn void Response.read_headers(&self, char[] headers)
     }
 }
 
-fn String Response.to_str(&self)
+fn String Response.str_view(&self)
 {
 
     DString res = dstring::temp();
