@@ -143,13 +143,9 @@ fn String Response.str_view(&self)
 
 // 2. If Transfer-Encoding header is set to chunked, we need to parse the body as
 //    an individual chunk
-//fn void? Response.recv(&self, TcpSocket* socket)
 fn void? Response.recv(&self, InStream socket)
 {
     char[4096] buf;
-
-    // 13. Content Length: Maybe from the split, do the same thing [clrf+4:content-length]
-    // 14. Content Length: Check if the slice is less than content-length, if so, call recv(), if its the same or more then just parse
     usz bytes_read;
 
     bool headers_parsed;
