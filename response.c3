@@ -101,18 +101,32 @@ fn String Response.str_view(&self)
         res.appendf("Connection: %s\r\n", self.headers.connection);
     }
 
-    res.appendf("Date: %s\r\n", self.headers.date);
+    if (self.headers.date.len > 0)
+    {
+        res.appendf("Date: %s\r\n", self.headers.date);
+    }
 
     if (self.headers.server.len > 0)
     {
         res.appendf("Server: %s\r\n", self.headers.server);
     }
 
-    res.appendf("Vary: %s\r\n", self.headers.vary);
-    res.appendf("Via: %s\r\n", self.headers.via);
-    res.appendf("Transfer-Encoding: %s\r\n", self.headers.transfer_encoding);
+    if (self.headers.vary.len > 0)
+    {
+        res.appendf("Vary: %s\r\n", self.headers.vary);
+    }
 
-    res.appendf("\r\n\r\n");
+    if (self.headers.via.len > 0)
+    {
+        res.appendf("Via: %s\r\n", self.headers.via);
+    }
+
+    if (self.headers.transfer_encoding.len > 0)
+    {
+        res.appendf("Transfer-Encoding: %s\r\n", self.headers.transfer_encoding);
+    }
+
+    res.appendf(CLRF);
 
     if (self.body.len > 0)
     {
