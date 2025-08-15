@@ -107,8 +107,12 @@ fn Response? get(String input, String accept=ContentType.ANY.str, String lang=La
     //TODO: Check number of read bytes, if 0, return an error.
     //tora::debug("number of read_bytes: %s", read_bytes);
 
+    Socket s = (Socket) soc;
+    //Response response;
+    //response.recv(&soc)!!;
+
     Response response;
-    response.recv(&soc)!!;
+    response.recv(&s)!!;
 
     tora::debug("after call to recv()");
 
