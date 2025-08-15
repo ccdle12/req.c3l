@@ -92,6 +92,64 @@ fn void Response.deserialize(&self, char[] buf)
 
         if ("content-length" == key)
         {
+            self.headers.content_length = (usz) kv[1].to_uint()!!;
+        }
+
+        if ("connection" == key)
+        {
+            self.headers.connection = kv[1].trim();
+        }
+    }
+}
+
+fn void Response.read_headers(&self, String *headers)
+{
+    String[] split_headers = headers.tsplit("\r\n");
+    String[] status = split_headers[0].tsplit(" ");
+
+    self.version = status[0];
+    self.status = status[1];
+
+    foreach (&line : split_headers[1..])
+    {
+        // Split into two halves on the first occurence of `:`
+        String[] kv = line.tsplit(":", 2);
+
+        String key = kv[0];
+        key.convert_to_lower();
+
+        if ("content-type" == key)
+        {
+            self.headers.content_type = kv[1].trim();
+        }
+
+        if ("date" == key)
+        {
+            self.headers.date = kv[1].trim();
+        }
+
+        if ("via" == key)
+        {
+            self.headers.via = kv[1].trim();
+        }
+
+        if ("vary" == key)
+        {
+            self.headers.vary = kv[1].trim();
+        }
+
+        if ("server" == key)
+        {
+            self.headers.server = kv[1].trim();
+        }
+
+        if ("content-type" == key)
+        {
+            self.headers.content_type = kv[1].trim();
+        }
+
+        if ("content-length" == key)
+        {
             self.headers.content_length = libc::atoi(kv[1]);
         }
 
