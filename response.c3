@@ -265,8 +265,8 @@ fn void? Response.recv(&self, TcpSocket* socket)
             }
         }
 
-        usz chunk_size = (usz) libc::strtol(buf[clrf_idx:3], null, 16);
-        usz chunk_offset = clrf_idx+3;
+        ulong chunk_size = libc::strtol(buf[clrf_idx:3], null, 16);
+        ulong chunk_offset = clrf_idx+3;
 
         self.read_chunked_body(&buf, chunk_offset, chunk_size);
 
@@ -274,13 +274,13 @@ fn void? Response.recv(&self, TcpSocket* socket)
     }
 }
 
-fn void Response.read_chunked_body(&self, char[] buf, usz chunk_offset, usz chunk_size)
+fn void Response.read_chunked_body(&self, char[] buf, ulong chunk_offset, ulong chunk_size)
 {
     char[4092] body_buf;
-    usz body_idx;
-    usz body_end_idx = chunk_offset + chunk_size;
+    ulong body_idx;
+    ulong body_end_idx = chunk_offset + chunk_size;
 
-    for (usz i = chunk_offset; i < body_end_idx; i++)
+    for (ulong i = chunk_offset; i < body_end_idx; i++)
     {
         body_buf[body_idx] = buf[i];
         body_idx++;
