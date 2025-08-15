@@ -118,47 +118,42 @@ fn void Response.read_headers(&self, String *headers)
         String key = kv[0];
         key.convert_to_lower();
 
-        if ("content-type" == key)
+        if (CONTENT_TYPE == key)
         {
             self.headers.content_type = kv[1].trim();
         }
 
-        if ("date" == key)
+        if (DATE == key)
         {
             self.headers.date = kv[1].trim();
         }
 
-        if ("via" == key)
+        if (VIA == key)
         {
             self.headers.via = kv[1].trim();
         }
 
-        if ("vary" == key)
+        if (VARY == key)
         {
             self.headers.vary = kv[1].trim();
         }
 
-        if ("server" == key)
+        if (SERVER == key)
         {
             self.headers.server = kv[1].trim();
         }
 
-        if ("content-type" == key)
-        {
-            self.headers.content_type = kv[1].trim();
-        }
-
-        if ("content-length" == key)
+        if (CONTENT_LENGTH == key)
         {
             self.headers.content_length = libc::atoi(kv[1]);
         }
 
-        if ("connection" == key)
+        if (CONNECTION == key)
         {
             self.headers.connection = kv[1].trim();
         }
 
-        if ("transfer-encoding" == key)
+        if (TRANSFER_ENCODING == key)
         {
             self.headers.transfer_encoding = kv[1].trim();
         }
