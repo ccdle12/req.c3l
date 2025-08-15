@@ -136,13 +136,6 @@ fn String Response.str_view(&self)
     return res.str_view();
 }
 
-//TODO:
-// 1. If there is a content-length header, ready the body according to this size
-// - The problem is:
-// - The body might have whitespace
-
-// 2. If Transfer-Encoding header is set to chunked, we need to parse the body as
-//    an individual chunk
 fn void? Response.recv(&self, InStream socket)
 {
     char[4096] buf;
