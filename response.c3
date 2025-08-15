@@ -214,88 +214,77 @@ fn void? Response.recv(&self, TcpSocket* socket)
 {
     char[4096] buf;
 
-    // TODO LATEST: I think this should be the plan:
-    // 1. Read into buf
-    // 2. Cast buf to String and check for CLRF
-    // 3. If no CLRF, continue
-    // 4. If CLRF found split and process headers
-    // 5. Record the number of bytes read so far and the idx+4 of CLRF
-    // 6. Check the headers content type and length:
-    //  - Is it chunking?
-    //  - Is it content length?
-    // 7. Create a slice into the buf from clrf+4 to end
-    // 8. Chunking: Read [clrf+4:3] to get the ASCII numberical representation and cast to int
-    // 9. Chunking: Slice again [clrf+7:chunk_size] (+7 now includes the CLRF offset and the chunk size offset)
-    // 10. Chunking: Check if the slice contains the termination character "0\r\n\r\n"?
-    // 11. Chunking: If termination character exists in slice, then slice again [clrf+7:chunk_size] or minus "0\r\n\r\n"
-    // 12. Chunking: If doesn't contain, then call recv() in a loop until chunk termination appears.
     // 13. Content Length: Maybe from the split, do the same thing [clrf+4:content-length]
     // 14. Content Length: Check if the slice is less than content-length, if so, call recv(), if its the same or more then just parse
+    usz bytes_read;
+
     bool headers_parsed;
-    usz header_bytes_read;
-    usz clrf_idx;
-
-    while (!headers_parsed || header_bytes_read > 4096)
+    while (!headers_parsed || bytes_read > 4096)
     {
-        header_bytes_read += socket.read(buf[header_bytes_read..])!;
+        tora::debug("header loop");
+        bytes_read += socket.read(buf[bytes_read..])!;
         // MAYBE THIS SHOULD BE A FAILED READ?
-        if (header_bytes_read == 0) return;
+        if (bytes_read == 0) return;
 
-        String buffer = (String) buf[0..header_bytes_read];
-
-        // TODO:
-        // 1. check if we have the headers and body separator?
-        // - What to do if we don't have it or just throw an error? it should be big enough to fit?
+        String read_bytes = (String) buf[0..bytes_read];
 
         // TODO: This is a DDOS vector
-        if (!buffer.contains(CLRF)) continue;
+        if (!read_bytes.contains(CLRF)) continue;
 
-        clrf_idx = buffer.index_of(CLRF)!!;
-
-        // 2. Split the buffer by the separator and process header
-        String[] split_packet = buffer.tsplit(CLRF);
-        self.read_headers(&split_packet[0]);
-
+        self.read_headers(&read_bytes.tsplit(CLRF)[0]);
         headers_parsed = true;
     }
 
-    // NOTE: Kind of crazy
-    // 1. offset the clrf_idx by 4 since its the end of `\r\n\r\n`
-    usz clrf_offset = clrf_idx+4;
+    usz clrf_idx = ((String) &buf).index_of(CLRF)!! + 4;
 
-    if ("chunked" == self.headers.transfer_encoding)
+    if (self.headers.transfer_encoding == CHUNKED_ENCODING)
     {
-        String body_tmp = (String) buf[clrf_offset..];
+        String body_bytes = (String) buf[clrf_idx..];
 
-        // TODO: Check if the buffer contains the termination, if not recv()
-        if (!body_tmp.contains(CLRF_END))
+        if (!body_bytes.contains(CLRF_END))
         {
             bool body_parsed;
-            while (!body_parsed || header_bytes_read > 4096)
+            while (!body_parsed || bytes_read > 4096)
             {
-                header_bytes_read += socket.read(buf[header_bytes_read..])!;
-                String bf = (String) &buf;
-
-                if (body_tmp.contains(CLRF_END))
+                usz bytes_len = socket.read(buf[bytes_read..])!;
+                if (bytes_len == 0)
                 {
                     body_parsed = true;
                     break;
                 }
+
+                bytes_read += bytes_len;
+
+                // TODO: I think this should be checking from clrf_idx since thats the point.
+                // It's this point until the end looking for CLRF_END.
+                String read_bytes = (String) buf[clrf_idx..];
+                tora::debug("CHUNK read_bytes: %s", read_bytes);
+
+                // TODO: DDOS vector
+                if (read_bytes.contains(CLRF_END)) body_parsed = true;
             }
         }
 
-        usz chunk_size = (usz) libc::strtol(buf[clrf_offset:3], null, 16);
-        usz clrf_chunk_offset = clrf_offset+3;
+        usz chunk_size = (usz) libc::strtol(buf[clrf_idx:3], null, 16);
+        usz chunk_offset = clrf_idx+3;
 
-        char[4092] body_buf;
-        usz body_idx;
-        for (usz i = clrf_chunk_offset; i < clrf_chunk_offset+chunk_size; i++)
-        {
-            body_buf[body_idx] = buf[i];
-            body_idx++;
-        }
+        self.read_chunked_body(&buf, chunk_offset, chunk_size);
 
-        tora::debug("SLICING body_buf: %s", (String) body_buf[..chunk_size]);
-    }// if
+        tora::debug("self: \n%s", self.to_str());
+    }
+}
 
+fn void Response.read_chunked_body(&self, char[] buf, usz chunk_offset, usz chunk_size)
+{
+    char[4092] body_buf;
+    usz body_idx;
+    usz body_end_idx = chunk_offset + chunk_size;
+
+    for (usz i = chunk_offset; i < body_end_idx; i++)
+    {
+        body_buf[body_idx] = buf[i];
+        body_idx++;
+    }
+
+    self.body = (String) body_buf[..body_idx];
 }
