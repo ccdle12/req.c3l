@@ -161,60 +161,57 @@ fn void? Response.recv(&self, InStream socket)
         // TODO: This is a DDOS vector
         if (!read_bytes.contains(CLRF)) continue;
 
-        self.read_headers(&read_bytes.tsplit(CLRF)[0]);
+        self.read_headers(read_bytes.tsplit(CLRF)[0]);
         headers_parsed = true;
     }
 
     usz clrf_idx = ((String) &buf).index_of(CLRF)!! + 4;
 
+    String body_bytes = (String) buf[clrf_idx..];
+    if (!body_bytes.contains(CLRF_END))
+    {
+        bool body_parsed;
+        while (!body_parsed || bytes_read > 4096)
+        {
+            usz bytes_len = socket.read(buf[bytes_read..])!;
+            if (bytes_len == 0)
+            {
+                body_parsed = true;
+                break;
+            }
+
+            bytes_read += bytes_len;
+
+            // TODO: I think this should be checking from clrf_idx since thats the point.
+            // It's this point until the end looking for CLRF_END.
+            String read_bytes = (String) buf[clrf_idx..];
+            tora::debug("CHUNK read_bytes: %s", read_bytes);
+
+            // TODO: DDOS vector
+            if (read_bytes.contains(CLRF_END)) body_parsed = true;
+        }
+    }
+
     if (self.headers.transfer_encoding == CHUNKED_ENCODING)
     {
-        String body_bytes = (String) buf[clrf_idx..];
-
-        if (!body_bytes.contains(CLRF_END))
-        {
-            bool body_parsed;
-            while (!body_parsed || bytes_read > 4096)
-            {
-                usz bytes_len = socket.read(buf[bytes_read..])!;
-                if (bytes_len == 0)
-                {
-                    body_parsed = true;
-                    break;
-                }
-
-                bytes_read += bytes_len;
-
-                // TODO: I think this should be checking from clrf_idx since thats the point.
-                // It's this point until the end looking for CLRF_END.
-                String read_bytes = (String) buf[clrf_idx..];
-                tora::debug("CHUNK read_bytes: %s", read_bytes);
-
-                // TODO: DDOS vector
-                if (read_bytes.contains(CLRF_END)) body_parsed = true;
-            }
-        }
-
         ulong chunk_size = libc::strtol(buf[clrf_idx:3], null, 16);
         ulong chunk_offset = clrf_idx+3;
 
-        self.read_chunked_body(&buf, chunk_offset, chunk_size);
+        self.read_body(buf[chunk_offset..], chunk_size);
+        return;
+    }
 
-        tora::debug("self: \n%s", self.to_str());
+    if (self.headers.content_length > 0)
+    {
+        // TODO: WHY OFFSET BY 2 WORKS? Maybe some whitespace that needs trimming?
+        self.read_body(buf[clrf_idx..], self.headers.content_length + 2);
+        return;
     }
 }
 
-fn void Response.read_chunked_body(&self, char[] buf, ulong chunk_offset, ulong chunk_size)
+fn void Response.read_body(&self, char[] buf, ulong length)
 {
     char[4092] body_buf;
-    ulong body_idx;
-    ulong body_end_idx = chunk_offset + chunk_size;
-
-    for (ulong i = chunk_offset; i < body_end_idx; i++)
-    {
-        body_buf[body_idx] = buf[i];
-        body_idx++;
-    }
-
-    self.body = (String) body_buf[..body_idx];
+    mem::copy(&body_buf, buf, length);
+    self.body = (String) body_buf[..length];
 }
