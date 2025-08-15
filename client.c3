@@ -97,16 +97,20 @@ fn Response? get(String input, String accept=ContentType.ANY.str, String lang=La
     tora::debug("sent_bytes: %s", sent_bytes);
 
     // TODO: Read everything from read in one-go, only one syscall? Is this better?
-    char[8192] buf;
-    usz read_bytes = soc.read(&buf)!;
+    //char[8192] buf;
+    //usz read_bytes = soc.read(&buf)!;
+    //if (read_bytes == 0) return FAIL_READ?;
 
-    if (read_bytes == 0) return FAIL_READ?;
+    //tora::debug("READ BYTES: %s", read_bytes);
+    //tora::debug("DOES THIS WORK:\n %s", (String) &buf);
 
-    // TODO: Check number of read bytes, if 0, return an error.
-    tora::debug("number of read_bytes: %s", read_bytes);
+    //TODO: Check number of read bytes, if 0, return an error.
+    //tora::debug("number of read_bytes: %s", read_bytes);
 
     Response response;
-    response.deserialize(&buf);
+    response.recv(&soc)!!;
+
+    tora::debug("after call to recv()");
 
     return response;
 }
