@@ -13,22 +13,9 @@ struct Response
     Headers headers;
 }
 
-
-
-// TMP: For test purposes, will need to get back and fix this up.
-fn void Response.deserialize(&self, char[] buf)
+fn void Response.read_headers(&self, char[] headers)
 {
-    String *tmp = (String*) &buf;
-    self.read_headers(tmp);
-
-    usz clrf_idx = tmp.index_of(CLRF)!! + 4;
-    self.body = (String) buf[clrf_idx..buf.len-1];
-}
-
-
-fn void Response.read_headers(&self, String *headers)
-{
-    String[] split_headers = headers.tsplit("\r\n");
+    String[] split_headers = ((String) headers).tsplit("\r\n");
     String[] status = split_headers[0].tsplit(" ");
 
     self.version = status[0];
