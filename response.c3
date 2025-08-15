@@ -158,5 +158,156 @@ fn void Response.read_headers(&self, String *headers)
             self.headers.connection = kv[1].trim();
         }
 
+        if ("transfer-encoding" == key)
+        {
+            self.headers.transfer_encoding = kv[1].trim();
+        }
     }
+}
+
+fn String Response.to_str(&self)
+{
+
+    DString res = dstring::temp();
+    res.appendf("%s ", self.version);
+    res.appendf("%s\r\n", self.status);
+
+    if (self.headers.host.len > 0)
+    {
+        res.appendf("Host: %s\r\n", self.headers.host);
+    }
+
+    if (self.headers.user_agent.len > 0)
+    {
+        res.appendf("User-Agent: %s\r\n", self.headers.user_agent);
+    }
+
+    if (self.headers.content_length > 0)
+    {
+        res.appendf("Content-Length: %s\r\n", self.headers.content_length);
+    }
+
+    res.appendf("Content-Type: %s\r\n", self.headers.content_type);
+
+    if (self.headers.connection.len > 0)
+    {
+        res.appendf("Connection: %s\r\n", self.headers.connection);
+    }
+
+    res.appendf("Date: %s\r\n", self.headers.date);
+
+    if (self.headers.server.len > 0)
+    {
+        res.appendf("Server: %s\r\n", self.headers.server);
+    }
+
+    res.appendf("Vary: %s\r\n", self.headers.vary);
+    res.appendf("Via: %s\r\n", self.headers.via);
+    res.appendf("Transfer-Encoding: %s\r\n", self.headers.transfer_encoding);
+
+    res.appendf("\r\n\r\n");
+
+    if (self.body.len > 0)
+    {
+        res.appendf("Body: %s\r\n", self.body);
+    }
+
+    return res.str_view();
+}
+
+fn void? Response.recv(&self, TcpSocket* socket)
+{
+    char[4096] buf;
+
+    // TODO LATEST: I think this should be the plan:
+    // 1. Read into buf
+    // 2. Cast buf to String and check for CLRF
+    // 3. If no CLRF, continue
+    // 4. If CLRF found split and process headers
+    // 5. Record the number of bytes read so far and the idx+4 of CLRF
+    // 6. Check the headers content type and length:
+    //  - Is it chunking?
+    //  - Is it content length?
+    // 7. Create a slice into the buf from clrf+4 to end
+    // 8. Chunking: Read [clrf+4:3] to get the ASCII numberical representation and cast to int
+    // 9. Chunking: Slice again [clrf+7:chunk_size] (+7 now includes the CLRF offset and the chunk size offset)
+    // 10. Chunking: Check if the slice contains the termination character "0\r\n\r\n"?
+    // 11. Chunking: If termination character exists in slice, then slice again [clrf+7:chunk_size] or minus "0\r\n\r\n"
+    // 12. Chunking: If doesn't contain, then call recv() in a loop until chunk termination appears.
+    // 13. Content Length: Maybe from the split, do the same thing [clrf+4:content-length]
+    // 14. Content Length: Check if the slice is less than content-length, if so, call recv(), if its the same or more then just parse
+    bool headers_parsed;
+    usz header_bytes_read;
+    usz clrf_idx;
+
+    while (!headers_parsed || header_bytes_read > 4096)
+    {
+        header_bytes_read += socket.read(buf[header_bytes_read..])!;
+        // MAYBE THIS SHOULD BE A FAILED READ?
+        if (header_bytes_read == 0) return;
+
+        String buffer = (String) &buf;
+
+        // TODO:
+        // 1. check if we have the headers and body separator?
+        // - What to do if we don't have it or just throw an error? it should be big enough to fit?
+
+        // TODO: This is a DDOS vector
+        if (!buffer.contains("\r\n\r\n")) continue;
+
+        clrf_idx = buffer.index_of("\r\n\r\n")!!;
+
+        // 2. Split the buffer by the separator and process header
+        String[] split_packet = buffer.tsplit("\r\n\r\n");
+        self.read_headers(&split_packet[0]);
+
+        headers_parsed = true;
+    }
+
+    // NOTE: Kind of crazy
+    // 1. offset the clrf_idx by 4 since its the end of `\r\n\r\n`
+    String body_tmp = (String) buf[clrf_idx+4..];
+    tora::debug("SIZE: %s", (String) buf[clrf_idx+4:3]);
+
+    // 2. This is another crazy hack. clrf_idx+7 offset is basically after
+    // the chunk length.
+    // 141*8 - 141 is the hardcoded chunk length and multiply by 8 because its 141
+    // BYTES.
+    String bt = (String) buf[clrf_idx+7:(141*8)];
+    tora::debug("SLICING: %s", bt);
+
+    // 3. Splits the body by \r\n
+    String[] body = body_tmp.trim().tsplit("\r\n");
+    tora::debug("BODY: %s", body);
+
+    // 4. Going through and checking for termination "0".
+    foreach (&str : body)
+    {
+        if (str.contains("0"))
+        {
+            self.body = bt;
+            tora::debug("RESPONSE with body in first body check: \n%s", self.to_str());
+            return;
+        }
+    }
+
+    bool body_parsed;
+    while (!body_parsed || header_bytes_read > 4096)
+    {
+        header_bytes_read += socket.read(buf[header_bytes_read..])!;
+        String bf = (String) &buf;
+
+        String[] sp = bf.tsplit("\r\n\r\n");
+        String[] b = sp[1].tsplit("\r\n");
+
+        if (b[^1].contains("0"))
+        {
+            self.body = b[^2];
+            tora::debug("RESPONSE header bytes read index: \n%s", header_bytes_read);
+            tora::debug("RESPONSE header bytes read: \n%s", (int) buf[header_bytes_read]);
+            tora::debug("RESPONSE with body in loop: \n%s", self.to_str());
+            return;
+        }
+    }
+
 }
