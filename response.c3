@@ -126,7 +126,7 @@ fn String Response.str_view(&self)
         res.appendf("Transfer-Encoding: %s\r\n", self.headers.transfer_encoding);
     }
 
-    res.appendf(CLRF);
+    res.appendf(CRLF);
 
     if (self.body.len > 0)
     {
@@ -164,7 +164,7 @@ fn void? Response.recv(&self, InStream socket)
 
     self.read_headers(dyn_buf.array_view());
 
-    // TODO: Its a hack but need to account for new line after CLRF
+    // TODO: Its a hack but need to account for new line after CRLF
     // I got make this more clear and to check.
     // It's inclusive of the last char, thats why I added the plus one.
     // Maybe I should make this more clear in the docs.

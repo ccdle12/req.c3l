@@ -1,8 +1,8 @@
 module req;
 
 // Header and Body end
-const String CLRF = "\r\n\r\n";
-const String CLRF_END = "0\r\n\r\n";
+const String CRLF ="\r\n";
+const String CRLF_END = "0\r\n\r\n";
 
 // Keys for Headers
 const String CONTENT_TYPE = "content-type";
