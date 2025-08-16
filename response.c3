@@ -2,6 +2,7 @@ module req;
 
 import std::net;
 import std::io;
+import std::collections;
 import libc;
 import tora;
 
@@ -74,7 +75,6 @@ fn void Response.read_headers(&self, char[] headers)
 
 fn String Response.str_view(&self)
 {
-
     DString res = dstring::temp();
     res.appendf("%s ", self.version);
     res.appendf("%s\r\n", self.status);
@@ -138,73 +138,101 @@ fn String Response.str_view(&self)
 
 fn void? Response.recv(&self, InStream socket)
 {
-    char[4096] buf;
+    List{char} dyn_buf;
+    dyn_buf.tinit();
     usz bytes_read;
+    char[4096] buf;
 
-    bool headers_parsed;
-    while (!headers_parsed || bytes_read > 4096)
+    CRLFState state = START;
+    while (state != END)
     {
         tora::debug("header loop");
-        bytes_read += socket.read(buf[bytes_read..])!;
+        bytes_read += socket.read(&buf)!;
         // MAYBE THIS SHOULD BE A FAILED READ?
         if (bytes_read == 0) return;
 
-        String bytes = (String) buf[0..bytes_read];
+        // TODO: Maybe this loop should be up to bytes_read.
+        //foreach (&c : buf) dyn_buf.push(*c);
+        for (usz i = 0; i < bytes_read; i++)
+        {
+            dyn_buf.push(buf[i]);
+        }
 
-        // TODO: This is a DDOS vector
-        if (!bytes.contains(CLRF)) continue;
-
-        self.read_headers(bytes.tsplit(CLRF)[0]);
-        headers_parsed = true;
+        // TODO: DDOS vector we need a timeout
+        state = step_state_machine(&dyn_buf);
     }
 
-    usz clrf_idx = ((String) &buf).index_of(CLRF)!! + 4;
+    self.read_headers(dyn_buf.array_view());
 
-    String body_bytes = (String) buf[clrf_idx..];
-    if (!body_bytes.contains(CLRF_END))
+    // TODO: Its a hack but need to account for new line after CLRF
+    // I got make this more clear and to check.
+    // It's inclusive of the last char, thats why I added the plus one.
+    // Maybe I should make this more clear in the docs.
+    usz clrf_idx = step_state_machine_with_index(&dyn_buf) + 1;
+
+    CRLFBodyState body_state = ZERO;
+    while (body_state != END)
     {
-        bool body_parsed;
-        while (!body_parsed || bytes_read > 4096)
+        CRLF_Body_Result result = step_crlf_body(&dyn_buf);
+        body_state = result.second;
+
+        if (body_state == END) break;
+
+        char[4096] in_buf;
+        usz body_bytes_read = socket.read(&in_buf)!;
+        for (usz i = 0; i < body_bytes_read; i++)
         {
-            usz bytes_len = socket.read(buf[bytes_read..])!;
-            if (bytes_len == 0)
-            {
-                body_parsed = true;
-                break;
-            }
-
-            bytes_read += bytes_len;
-
-            // TODO: I think this should be checking from clrf_idx since thats the point.
-            // It's this point until the end looking for CLRF_END.
-            String read_bytes = (String) buf[clrf_idx..];
-            tora::debug("CHUNK read_bytes: %s", read_bytes);
-
-            // TODO: DDOS vector
-            if (read_bytes.contains(CLRF_END)) body_parsed = true;
+            dyn_buf.push(buf[i]);
         }
     }
 
     if (self.headers.transfer_encoding == CHUNKED_ENCODING)
     {
-        ulong chunk_size = libc::strtol(buf[clrf_idx:3], null, 16);
-        ulong chunk_offset = clrf_idx+3;
+        // NOTE: THIS IS JUST GETTING CHUNK SIZE
+        char[8192] tmp;
 
-        self.read_body(buf[chunk_offset..], chunk_size);
-        return;
+        usz j = 0;
+        for (usz i = clrf_idx; i < dyn_buf.len(); i++)
+        {
+            if (dyn_buf[i] == '\n') break;
+            tmp[j] = dyn_buf[i];
+            j++;
+        }
+
+        ulong chunk_size = libc::strtol(tmp[..j], null, 16);
+
+        // NOTE: This is reading from dynamic buffer to filtered by chunk size.
+        char[8192] filtered;
+        usz pointer = clrf_idx+j;
+        usz i = 0;
+        tora::debug("chunk_size: %s", chunk_size);
+        while(i < chunk_size)
+        {
+            if (dyn_buf[pointer] == '\r' || dyn_buf[pointer] == '\n')
+            {
+                pointer++;
+                continue;
+            }
+
+            filtered[i] = dyn_buf[pointer];
+            i++;
+            pointer++;
+        }
+
+        tora::debug("filtered: \n%s", (String) &filtered);
+
+        self.body = (String) &filtered;
+
     }
 
     if (self.headers.content_length > 0)
     {
-        // TODO: WHY OFFSET BY 2 WORKS? Maybe some whitespace that needs trimming?
-        self.read_body(buf[clrf_idx..], self.headers.content_length + 2);
-        return;
-    }
-}
+        // TODO: There was some error, needs to be handled better.
+        if (self.headers.content_length > dyn_buf.len()) return;
 
-fn void Response.read_body(&self, char[] buf, ulong length)
-{
-    char[4092] body_buf;
-    mem::copy(&body_buf, buf, length);
-    self.body = (String) body_buf[..length];
+        char[] view = dyn_buf.array_view();
+        self.body = (String) view[clrf_idx:self.headers.content_length];
+    }
+
+    tora::debug("self: \n%s", self.str_view());
 }
