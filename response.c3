@@ -2,7 +2,6 @@ module req;
 
 import std::net;
 import std::io;
-import std::collections;
 import libc;
 import tora;
 
