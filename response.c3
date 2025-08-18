@@ -135,119 +135,95 @@ fn String Response.str_view(&self)
     return res.str_view();
 }
 
+fn usz? Response.append_buf(&self, DString* dyn_buf, InStream socket)
+{
+    char[4096] buf;
+
+    usz bytes_read = socket.read(&buf)!;
+
+    // TODO: MAYBE THIS SHOULD BE A FAILED READ?
+    //if (bytes_read == 0) return;
+
+    // TODO: bytes_read can never be greater than in_buf len?
+    dyn_buf.append_chars((String) buf[..bytes_read]);
+
+    return bytes_read;
+
+}
+
+// TODO: Maybe this should be on client, Response probably shuoldn't know about the socket.
 fn void? Response.recv(&self, InStream socket)
 {
     DString dyn_buf = dstring::temp();
 
-    while (!dyn_buf.str_view().contains("\r\n\r\n"))
+    while (!contains_crlf(&dyn_buf))
     {
-        char[4096] in_buf;
-
-        tora::debug("header loop");
-        usz bytes_read = socket.read(&in_buf)!;
-        // MAYBE THIS SHOULD BE A FAILED READ?
-        if (bytes_read == 0) return;
-
-        // TODO: Maybe this loop should be up to bytes_read.
-        for (usz i = 0; i < bytes_read; i++)
+        usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
+        if (try bytes_read)
         {
-            dyn_buf.append_char(in_buf[i]);
+            if (bytes_read == 0) return;
         }
     }
 
     self.read_headers(dyn_buf.str_view());
 
-    // TODO: Its a hack but need to account for new line after CRLF
-    // I got make this more clear and to check.
-    // It's inclusive of the last char, thats why I added the plus one.
-    // Maybe I should make this more clear in the docs.
-    //usz clrf_idx = step_state_machine_with_index(&dyn_buf) + 1;
-    usz clrf_idx = dyn_buf.str_view().index_of("\r\n\r\n")!! + 4;
+    usz clrf_idx = find_end_of_crlf(&dyn_buf)!;
 
-    // TMP: For reading content-length
     if (self.headers.content_length > 0)
     {
-        // 1. Get the CLRF_index
-        // 2. Calculate the bytes to read from the dynamic buffer
         if (clrf_idx + self.headers.content_length > dyn_buf.len())
         {
-            // call receive
+            usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
+            if (try bytes_read)
+            {
+                if (bytes_read == 0) return;
+            }
         }
 
-        self.body = (String) dyn_buf.str_view()[clrf_idx:self.headers.content_length];
+        // TODO: Safety, Need to check if clrf_idx and self.headers.content_lenght is less than dyn_buf?
+        String view = dyn_buf.str_view();
+        self.body = view[clrf_idx:self.headers.content_length];
     }
 
-    tora::debug("early dyn_buf.len(): %s", dyn_buf.len());
-
-    // TODO: Something like:
-    // - read the bytes until \r\n, this is the chunk size
-    // - read the next bytes as chunk size, it gets terminated on the next \r\n
-    // - Check the next chunk size, if its 0, then read teh next CRLF and stop
     if (self.headers.transfer_encoding == CHUNKED_ENCODING)
     {
-        tora::debug("CHUNKED ENCODING");
-        // NOTE: THIS IS JUST GETTING CHUNK SIZE
-        char[8192] tmp;
+        DString chunk_buf = dstring::temp();
+        usz chunk_offset = clrf_idx;
 
-        char[] foo = dyn_buf.str_view();
-
-        // TODO: TMP just to make sure theres no out of bounds
-        if (clrf_idx > dyn_buf.len()) return;
-
-        usz j = 0;
-        for (usz i = clrf_idx; i < dyn_buf.len(); i++)
+        while (true)
         {
-            // TMP: I'm not checking if the next is '\n'
-            if (dyn_buf.str_view()[i] == '\r') break;
-            tmp[j] = dyn_buf[i];
-            j++;
+            // TODO: Figure out this split safely
+            String view = dyn_buf.str_view();
+            String[] chunk_split = view[chunk_offset..].tsplit("\r\n");
+
+            usz chunk_byte_len = chunk_split[0].len;
+            ulong? chunk_size = chunk_split[0].to_uint(base: 16);
+
+            if (try chunk_size)
+            {
+                if (chunk_size == 0) break;
+
+                // TODO: Scary
+                while (clrf_idx + chunk_size > dyn_buf.len())
+                {
+                    usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
+                    if (try bytes_read)
+                    {
+                        if (bytes_read == 0) return;
+                    }
+
+                }
+
+                chunk_offset = clrf_idx + chunk_byte_len;
+                chunk_buf.append_chars(view[chunk_offset:chunk_size]);
+            }
+            else
+            {
+                break;
+            }
         }
 
-        tora::debug("j: %s", j);
-        ulong chunk_size = libc::strtol(tmp[..j], null, 16);
-        tora::debug("chunk_size: %s", chunk_size);
-        tora::debug("crlf idx: %s", clrf_idx);
-        tora::debug("dyn_buf len: %s", dyn_buf.len());
-
-        //char[] view = dyn_buf.array_view();
-        tora::debug("DYN BUF: \n%s", dyn_buf.str_view());
-
-        // NOTE: This is reading from dynamic buffer to filtered by chunk size.
-        char[8192] filtered;
-        usz pointer = clrf_idx+j+1;
-        usz i = 0;
-
-        tora::debug("pointer: %s", pointer);
-
-        // TODO: TMP just to make sure theres no out of bounds
-        //if (pointer > dyn_buf.len()) return;
-        //if (pointer+chunk_size > dyn_buf.len()) return;
-
-        tora::debug("clrf_idx: %s", clrf_idx+j);
-        tora::debug("chunk size: %s", chunk_size);
-        tora::debug("pointer + chunk_size: %s", pointer+chunk_size);
-        tora::debug("dyn_buf.len(): %s", dyn_buf.len());
-
-        while(i < chunk_size)
-        {
-            // TODO: Tmp to make sure no out of bounds
-            //if (pointer >= dyn_buf.len()) return;
-            //if (dyn_buf[pointer] == '\r' || dyn_buf[pointer] == '\n')
-            //{
-            //    pointer++;
-            //    continue;
-            //}
-
-            filtered[i] = dyn_buf.str_view()[pointer];
-            i++;
-            pointer++;
-        }
-
-        tora::debug("filtered: \n%s", (String) &filtered);
-
-        self.body = (String) &filtered;
+        self.body = chunk_buf.str_view();
+        tora::debug("response: \n%s", self.str_view());
     }
-
-
-    tora::debug("self: \n%s", self.str_view());
 }
