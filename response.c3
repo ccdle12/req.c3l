@@ -138,11 +138,9 @@ fn String Response.str_view(&self)
 
 fn void? Response.recv(&self, InStream socket)
 {
-    List{char} dyn_buf;
-    dyn_buf.tinit();
+    DString dyn_buf = dstring::temp();
 
-    CRLFState state = START;
-    while (state != END)
+    while (!dyn_buf.str_view().contains("\r\n\r\n"))
     {
         char[4096] in_buf;
 
@@ -154,21 +152,18 @@ fn void? Response.recv(&self, InStream socket)
         // TODO: Maybe this loop should be up to bytes_read.
         for (usz i = 0; i < bytes_read; i++)
         {
-            dyn_buf.push(in_buf[i]);
+            dyn_buf.append_char(in_buf[i]);
         }
-
-        // TODO: DDOS vector we need a timeout
-        state = step_state_machine(&dyn_buf);
     }
 
-    self.read_headers(dyn_buf.array_view());
+    self.read_headers(dyn_buf.str_view());
 
     // TODO: Its a hack but need to account for new line after CRLF
     // I got make this more clear and to check.
     // It's inclusive of the last char, thats why I added the plus one.
     // Maybe I should make this more clear in the docs.
-    usz clrf_idx = step_state_machine_with_index(&dyn_buf) + 1;
-
+    //usz clrf_idx = step_state_machine_with_index(&dyn_buf) + 1;
+    usz clrf_idx = dyn_buf.str_view().index_of("\r\n\r\n")!! + 4;
 
     // TMP: For reading content-length
     if (self.headers.content_length > 0)
@@ -180,8 +175,7 @@ fn void? Response.recv(&self, InStream socket)
             // call receive
         }
 
-        char[] view = dyn_buf.array_view();
-        self.body = (String) view[clrf_idx:self.headers.content_length];
+        self.body = (String) dyn_buf.str_view()[clrf_idx:self.headers.content_length];
     }
 
     tora::debug("early dyn_buf.len(): %s", dyn_buf.len());
@@ -196,8 +190,7 @@ fn void? Response.recv(&self, InStream socket)
         // NOTE: THIS IS JUST GETTING CHUNK SIZE
         char[8192] tmp;
 
-
-        char[] foo = dyn_buf.array_view();
+        char[] foo = dyn_buf.str_view();
 
         // TODO: TMP just to make sure theres no out of bounds
         if (clrf_idx > dyn_buf.len()) return;
@@ -206,7 +199,7 @@ fn void? Response.recv(&self, InStream socket)
         for (usz i = clrf_idx; i < dyn_buf.len(); i++)
         {
             // TMP: I'm not checking if the next is '\n'
-            if (dyn_buf[i] == '\r') break;
+            if (dyn_buf.str_view()[i] == '\r') break;
             tmp[j] = dyn_buf[i];
             j++;
         }
@@ -217,8 +210,8 @@ fn void? Response.recv(&self, InStream socket)
         tora::debug("crlf idx: %s", clrf_idx);
         tora::debug("dyn_buf len: %s", dyn_buf.len());
 
-        char[] view = dyn_buf.array_view();
-        tora::debug("DYN BUF: \n%s", (String) view);
+        //char[] view = dyn_buf.array_view();
+        tora::debug("DYN BUF: \n%s", dyn_buf.str_view());
 
         // NOTE: This is reading from dynamic buffer to filtered by chunk size.
         char[8192] filtered;
@@ -246,7 +239,7 @@ fn void? Response.recv(&self, InStream socket)
             //    continue;
             //}
 
-            filtered[i] = dyn_buf[pointer];
+            filtered[i] = dyn_buf.str_view()[pointer];
             i++;
             pointer++;
         }
