@@ -113,3 +113,13 @@ fn CRLF_Body_Result step_crlf_body(List{char}* buf)
 
     return { .first = index, .second = state };
 }
+
+fn usz? find_end_of_crlf(DString* dyn_buf)
+{
+    return dyn_buf.str_view().index_of("\r\n\r\n") + 4;
+}
+
+fn bool contains_crlf(DString* dyn_buf)
+{
+ return dyn_buf.str_view().contains(CRLF);
+}
