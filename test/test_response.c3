@@ -11,7 +11,7 @@ fn void test_ok_0() @test
         "Content-Length: 115 \r\n",
         "Connection: keep-alive \r\n",
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n",
-        "Server: nginx/1.18.0 \r\n",
+        "Server: nginx/1.18.0",
 
         // Headers and Body separator
         CRLF,
@@ -39,31 +39,33 @@ fn void test_ok_1() @test
     String[*] input =
     {
       "HTTP/1.1 200 OK \r\n",
-      "Content-Type: application/json \r\n",
-      "Date: Fri, 15 Aug 2025 16:59:17 GMT \r\n",
-      "Vary: Accept-Encoding \r\n",
-      "Via: 1.1 Caddy \r\n",
-      "Transfer-Encoding: chunked \r\n",
+      "access-control-allow-origin: *\r\n",
+      "content-type: application/json \r\n",
+      "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
+      "vary: Accept-Encoding \r\n",
+      "via: 1.1 Caddy \r\n",
+      "transfer-encoding: chunked",
 
       // Headers and Body separator
       CRLF,
 
       // Chunk Length
-      "10F\r\n",
+      "141\r\n",
       "{\r\n",
-          "\"method\": \"GET\" \r\n",
-          "\"protocol\": \"http\" \r\n",
-          "\"host\": \"echo.free.beeceptor.com\" \r\n",
-          "\"path\": \"/\" \r\n",
-          "\"ip\": \"213.22.219.242:35126\" \r\n",
-          "\"headers\": { \n",
-          "\"Host\": \"echo.free.beeceptor.com\" \r\n",
-          "\"User-Agent\": \"curl/8.12.1\" \r\n",
-          "\"Accept\": \"*/*\" \r\n",
-          "\"Via\": \"1.1 Caddy\" \r\n",
-          "\"Accept-Encoding\": \"gzip\" \r\n",
+          "  \"method\": \"GET\",\r\n",
+          "  \"protocol\": \"http\",\r\n",
+          "  \"host\": \"echo.free.beeceptor.com\",\r\n",
+          "  \"path\": \"/\",\r\n",
+          "  \"ip\": \"213.22.219.242:35126\",\r\n",
+          "  \"headers\": {\r\n",
+          "  \"Host\": \"echo.free.beeceptor.com\",\r\n",
+          "  \"User-Agent\": \"curl/8.12.1\",\r\n",
+          "  \"Accept\": \"*/*\",\r\n",
+          "  \"Via\": \"1.1 Caddy\",\r\n",
+          "  \"Accept-Encoding\": \"gzip\"\r\n",
+       "},\r\n",
+       "\"parsedQueryParams\": {}\r\n",
        "}\r\n",
-       "\"parsedQueryParams\": {} \r\n",
       CRLF_END,
     };
 
@@ -77,6 +79,7 @@ fn void test_ok_1() @test
     test::eq(res.headers.transfer_encoding, CHUNKED_ENCODING);
     test::eq(res.headers.via, "1.1 Caddy");
 
+    tora::debug("response: \n%s", res.str_view());
     // TODO: For some reason, its turning upper case letters into lower case
     //test::@check(res.body.contains("parsedQueryParams"));
     test::@check(res.body.contains("parsedqueryparams"));
@@ -91,7 +94,7 @@ fn void test_internal_error_0() @test
         "Content-Length: 68 \r\n",
         "Connection: keep-alive \r\n",
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n",
-        "Server: nginx/1.18.0 \r\n",
+        "Server: nginx/1.18.0",
 
         // Headers and Body separator
         CRLF,
@@ -127,13 +130,12 @@ fn void test_headers_via() @test
         "Date: Thu, 14 Aug 2025 10:56:43 GMT\r\n",
         "Vary: Accept-Encoding\r\n",
         "Via: 1.1 Caddy\r\n",
-        "Transfer-Encoding: chunked\r\n",
+        "Transfer-Encoding: chunked",
 
         CRLF,
 
-        // TODO: If this doesn't have \n\r, its going to have a buffer overflow, need to revisit
-        "1\n\r",
-        "{\n\r",
+        "5\r\n",
+        "{\r\n",
 
         CRLF_END,
     };
@@ -153,7 +155,7 @@ fn void test_bad_request_0() @test
       "HTTP/1.1 400 Bad Request \r\n",
       "Content-Type: text/plain; charset=utf-8 \r\n",
       "Content-Length: 16\r\n",
-      "Connection: close \r\n",
+      "Connection: close",
 
       // Headers and Body separator
       CRLF,
