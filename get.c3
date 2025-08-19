@@ -55,3 +55,16 @@ fn Response? get(String input, String accept=ContentType.ANY.str, String lang=La
 
     return response;
 }
+
+fn uint scheme_to_port(String scheme) @private
+{
+    scheme.convert_to_lower();
+
+    if (scheme == "http")
+    {
+            return 80;
+    }
+
+    // TODO: We will assume an https connection
+    return 443;
+}
