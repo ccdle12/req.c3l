@@ -11,6 +11,7 @@ struct Response
     String status;
     String body;
     Headers headers;
+    Body_Parse_State body_state;
 }
 
 fn void Response.read_headers(&self, char[] headers)
@@ -70,6 +71,8 @@ fn void Response.read_headers(&self, char[] headers)
             self.headers.transfer_encoding = kv[1].trim();
         }
     }
+
+    self.set_body_parse_state();
 }
 
 fn String Response.str_view(&self)
@@ -151,6 +154,31 @@ fn usz? Response.append_buf(&self, DString* dyn_buf, InStream socket)
 
 }
 
+enum Body_Parse_State
+{
+    NONE,
+    CONTENT_LENGTH,
+    CHUNKED,
+}
+
+fn void Response.set_body_parse_state(&self)
+{
+    if (self.headers.transfer_encoding == CHUNKED_ENCODING)
+    {
+        self.body_state = CHUNKED;
+        return;
+    }
+
+    if (self.headers.content_length > 0)
+    {
+        self.body_state = CONTENT_LENGTH;
+        return;
+    }
+
+    self.body_state = NONE;
+    return;
+}
+
 // TODO: Maybe this should be on client, Response probably shuoldn't know about the socket.
 fn void? Response.recv(&self, InStream socket)
 {
@@ -166,64 +194,64 @@ fn void? Response.recv(&self, InStream socket)
     }
 
     self.read_headers(dyn_buf.str_view());
-
     usz clrf_idx = find_end_of_crlf(&dyn_buf)!;
 
-    if (self.headers.content_length > 0)
+    switch(self.body_state)
     {
-        if (clrf_idx + self.headers.content_length > dyn_buf.len())
-        {
-            usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
-            if (try bytes_read)
+        case NONE:
+            // TODO: NEED TO HANDLE THIS AS A FAILED PARSE
+            return;
+        case CONTENT_LENGTH:
+            if (clrf_idx + self.headers.content_length > dyn_buf.len())
             {
-                if (bytes_read == 0) return;
-            }
-        }
-
-        // TODO: Safety, Need to check if clrf_idx and self.headers.content_lenght is less than dyn_buf?
-        String view = dyn_buf.str_view();
-        self.body = view[clrf_idx:self.headers.content_length];
-    }
-
-    if (self.headers.transfer_encoding == CHUNKED_ENCODING)
-    {
-        DString chunk_buf = dstring::temp();
-        usz chunk_offset = clrf_idx;
-
-        while (true)
-        {
-            // TODO: Figure out this split safely
-            String view = dyn_buf.str_view();
-            String[] chunk_split = view[chunk_offset..].tsplit("\r\n");
-
-            usz chunk_byte_len = chunk_split[0].len;
-            ulong? chunk_size = chunk_split[0].to_uint(base: 16);
-
-            if (try chunk_size)
-            {
-                if (chunk_size == 0) break;
-
-                // TODO: Scary
-                while (clrf_idx + chunk_size > dyn_buf.len())
+                usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
+                if (try bytes_read)
                 {
-                    usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
-                    if (try bytes_read)
+                    if (bytes_read == 0) return;
+                }
+            }
+
+            // TODO: Safety, Need to check if clrf_idx and self.headers.content_lenght is less than dyn_buf?
+            String view = dyn_buf.str_view();
+            self.body = view[clrf_idx:self.headers.content_length];
+        case CHUNKED:
+            DString chunk_buf = dstring::temp();
+            usz chunk_offset = clrf_idx;
+
+            while (true)
+            {
+                // TODO: Figure out this split safely
+                String view = dyn_buf.str_view();
+                String[] chunk_split = view[chunk_offset..].tsplit("\r\n");
+
+                usz chunk_byte_len = chunk_split[0].len;
+                ulong? chunk_size = chunk_split[0].to_uint(base: 16);
+
+                if (try chunk_size)
+                {
+                    if (chunk_size == 0) break;
+
+                    // TODO: Scary
+                    while (clrf_idx + chunk_size > dyn_buf.len())
                     {
-                        if (bytes_read == 0) return;
+                        usz? bytes_read = self.append_buf(&dyn_buf, socket)!;
+                        if (try bytes_read)
+                        {
+                            if (bytes_read == 0) return;
+                        }
+
                     }
 
+                    chunk_offset = clrf_idx + chunk_byte_len;
+                    chunk_buf.append_chars(view[chunk_offset:chunk_size]);
                 }
-
-                chunk_offset = clrf_idx + chunk_byte_len;
-                chunk_buf.append_chars(view[chunk_offset:chunk_size]);
+                else
+                {
+                    break;
+                }
             }
-            else
-            {
-                break;
-            }
-        }
 
-        self.body = chunk_buf.str_view();
-        tora::debug("response: \n%s", self.str_view());
+            self.body = chunk_buf.str_view();
+            tora::debug("response: \n%s", self.str_view());
     }
 }
