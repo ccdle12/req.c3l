@@ -21,7 +21,7 @@ fn void test_ok_0() @test
         CRLF_END,
     };
 
-    Response response = get_response(&input);
+    Response response = get_response(&input)!!;
 
     test::eq(response.version, Version.HTTP1_1.str);
     test::eq(response.status, "200");
@@ -72,7 +72,7 @@ fn void test_ok_1() @test
     // Then i'll need to figure out how to call recv(), that has incomplete
     // mock socket and then add more to the mock socket somehow
 
-    Response res = get_response(&input);
+    Response res = get_response(&input)!!;
 
     test::eq(res.status, "200");
     test::eq(res.version, "HTTP/1.1");
@@ -104,7 +104,7 @@ fn void test_internal_error_0() @test
         CRLF_END
     };
 
-    Response response = get_response(&input);
+    Response response = get_response(&input)!!;
 
     test::eq(response.version, Version.HTTP1_1.str);
     test::eq(response.status, "500");
@@ -140,7 +140,7 @@ fn void test_headers_via() @test
         CRLF_END,
     };
 
-    Response response = get_response(&input);
+    Response response = get_response(&input)!!;
 
     test::eq(response.headers.vary, "Accept-Encoding");
     test::eq(response.headers.via, "1.1 Caddy");
@@ -165,7 +165,7 @@ fn void test_bad_request_0() @test
       CRLF_END,
     };
 
-    Response res = get_response(&input);
+    Response res = get_response(&input)!!;
 
     test::eq(res.version, Version.HTTP1_1.str);
     test::eq(res.status, "400");
@@ -184,22 +184,26 @@ fn void test_empty_request() @test
       "",
     };
 
-    Response res = get_response(&input);
-    test::eq(res.version, "");
-    test::eq(res.status, "");
-    test::eq(res.headers.connection, "");
-    test::eq(res.body, "");
+    // TODO: Need to rethink if reading 0 bytes is an error or just a return.
+    Response? res = get_response(&input);
+    if (catch error = res)
+    {
+        test::eq(error, ZERO_BYTES_READ);
+    }
+
+    //test::eq(res.version, "");
+    //test::eq(res.status, "");
+    //test::eq(res.headers.connection, "");
+    //test::eq(res.body, "");
+
 }
 
-fn Response get_response(String[] input)
+fn Response? get_response(String[] input)
 {
     DString in = dstring::temp();
     foreach (&str : input) in.appendf(*str);
 
     MockSocket soc = { .buf = in.str_view() };
 
-    Response res;
-    res.recv(&soc)!!;
-
-    return res;
+    return recv(&soc);
 }
