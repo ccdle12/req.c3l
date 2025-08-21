@@ -45,17 +45,6 @@ fn void test_headers() @test
     test::eq(headers.extra_headers[^1].second, "VALUE_9");
 }
 
-fn void test_request() @test
-{
-    Request request =
-    {
-        .uri = "/api/example",
-        .method = Method.GET,
-        .version = Version.HTTP1_1.str,
-        .body = "foo"
-    };
-}
-
 fn void test_request_init() @test
 {
     Request request = init("/api/example", Method.GET, "foo");
