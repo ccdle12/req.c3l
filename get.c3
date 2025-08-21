@@ -2,7 +2,6 @@ module req;
 
 import std::net::url;
 import std::net::tcp;
-import std::io;
 import tora;
 
 fn Response? get(String input, String accept=ContentType.ANY.str, String lang=Language.EN_US.str, String encoding = AcceptEncoding.GZIP.str, String content_type = ContentType.JSON.str)
