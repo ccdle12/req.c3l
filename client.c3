@@ -1,9 +1,6 @@
 module req;
 
-import std::net::url;
 import std::net::tcp;
-import std::io;
-import tora;
 
 faultdef FAIL_SEND, ZERO_BYTES_READ;
 
