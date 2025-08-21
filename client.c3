@@ -5,7 +5,7 @@ import std::net::tcp;
 import std::io;
 import tora;
 
-faultdef FAIL_SEND, FAIL_READ, ZERO_BYTES_READ;
+faultdef FAIL_SEND, ZERO_BYTES_READ;
 
 fn Response? recv(TcpSocket socket)
 {
