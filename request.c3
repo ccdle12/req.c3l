@@ -139,7 +139,7 @@ fn String Request.serialize(&self)
     }
 
     // THIS MUST BE REQUIRED AFTER A HEADER, EVEN WITHOUT A BODY
-    tmp.appendf("\r\n\r\n");
+    tmp.appendf(CRLF_SINGLE);
 
     if (self.body.len > 0)
     {

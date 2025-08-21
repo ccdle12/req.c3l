@@ -64,7 +64,7 @@ fn void test_request_serialization() @test
       "Connection: close\r\n",
       "Content-Type: application/json\r\n",
       "Content-Length: 30\r\n",
-      "\r\n\r\n",
+      CRLF_SINGLE,
       "{\"msg\": \"Hello World\"}"
     };
 
@@ -111,7 +111,7 @@ fn void test_request_without_fields() @test
       "Accept-Encoding: gzip\r\n",
       "Accept-Language: en-us\r\n",
       "Content-Type: application/json\r\n",
-      "\r\n\r\n",
+      CRLF_SINGLE,
     };
 
     DString expected = dstring::temp();
