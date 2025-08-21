@@ -1,8 +1,6 @@
 module req;
 
-import std::net::url;
 import std::net::tcp;
-import std::io;
 import tora;
 
 // TODO: Is there a way I can make this NOT InStream socket but make it a comptime where its either Socket or InStream?
