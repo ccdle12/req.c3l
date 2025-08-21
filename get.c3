@@ -48,8 +48,7 @@ fn Response? get(String input, String accept=ContentType.ANY.str, String lang=La
     if (sent_bytes == 0) return FAIL_SEND?;
     tora::debug("sent_bytes: %s", sent_bytes);
 
-    Socket s = (Socket) soc;
-    Response response = recv(&s)!!;
+    Response response = recv(soc)!!;
 
     tora::debug("after call to recv()");
 

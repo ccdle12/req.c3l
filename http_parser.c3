@@ -9,10 +9,10 @@ import tora;
 struct HTTPParser
 {
     DString dyn_buf;
-    InStream socket;
+    TcpSocket socket;
 }
 
-fn void HTTPParser.init(&self, InStream socket)
+fn void HTTPParser.init(&self, TcpSocket socket)
 {
     self.dyn_buf = dstring::temp();
     self.socket = socket;

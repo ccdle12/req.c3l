@@ -7,7 +7,7 @@ import tora;
 
 faultdef FAIL_SEND, FAIL_READ, ZERO_BYTES_READ;
 
-fn Response? recv(InStream socket)
+fn Response? recv(TcpSocket socket)
 {
     Response response;
 
