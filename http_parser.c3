@@ -3,7 +3,6 @@ module req;
 import std::net::tcp;
 import tora;
 
-// TODO: Is there a way I can make this NOT InStream socket but make it a comptime where its either Socket or InStream?
 struct HTTPParser
 {
     DString dyn_buf;
