@@ -21,7 +21,7 @@ fn void? HTTPParser.read_headers(&self, Response* response)
 {
     while (!contains_crlf(&self.dyn_buf))
     {
-        if (self.append_buf()! == 0) return ZERO_BYTES_READ?;
+        if (self.read_sock_to_buf()! == 0) return ZERO_BYTES_READ?;
     }
 
     response.deserialize_headers(self.dyn_buf.str_view());
@@ -49,7 +49,7 @@ fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline 
 
     if (clrf_idx + response.headers.content_length > self.dyn_buf.len())
     {
-        if (self.append_buf()! == 0) return;
+        if (self.read_sock_to_buf()! == 0) return;
     }
 
     // TODO: Safety, Need to check if clrf_idx and self.headers.content_lenght is less than dyn_buf?
@@ -81,7 +81,7 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
         // TODO: Scary
         while (clrf_idx + chunk_size > self.dyn_buf.len())
         {
-            usz? bytes_read = self.append_buf()!;
+            usz? bytes_read = self.read_sock_to_buf()!;
             if (try bytes_read)
             {
                 if (bytes_read == 0) return;
@@ -98,7 +98,7 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
 
 }
 
-fn usz? HTTPParser.append_buf(&self) @private
+fn usz? HTTPParser.read_sock_to_buf(&self) @private
 {
     char[4096] buf;
     usz bytes_read = self.socket.read(&buf)!;
