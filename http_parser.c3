@@ -58,43 +58,41 @@ fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline 
 
 fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @private
 {
-    usz clrf_idx = find_end_of_crlf(&self.dyn_buf)!;
-
+    usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
+    usz crlf_size = 2;
     DString chunk_buf = dstring::temp();
-    usz chunk_offset = clrf_idx;
 
-    while (true)
+    bool end_chunk_found = false;
+
+    while (current_offset < self.dyn_buf.len())
     {
-        // TODO: Figure out this split safely
-        String view = self.dyn_buf.str_view();
-        String[] chunk_split = view[chunk_offset..].tsplit("\r\n");
+        // TODO: Create a test to test this with a malformed &self.dyn_buf
+        DString chunk_size_str = dstring::temp();
+        while (current_offset < self.dyn_buf.len() && self.dyn_buf[current_offset] != '\r')
+        {
+            chunk_size_str.append_char(self.dyn_buf[current_offset]);
+            current_offset += 1;
+        }
 
-        usz chunk_byte_len = chunk_split[0].len;
-        ulong? chunk_size = chunk_split[0].to_uint(base: 16);
-
-        // TODO: Think through if this is the right thing to do. If we are
-        // unable to read the next chunk size, just return.
+        ulong? chunk_size = chunk_size_str.str_view().to_uint(base: 16);
+        // TODO: Return errors instead of just breaking
         if (catch excuse = chunk_size) break;
         if (chunk_size == 0) break;
 
-        // TODO: Scary
-        while (clrf_idx + chunk_size > self.dyn_buf.len())
-        {
-            usz? bytes_read = self.read_sock_to_buf()!;
-            if (try bytes_read)
-            {
-                if (bytes_read == 0) return;
-            }
+        current_offset += crlf_size;
 
+        usz i = 0;
+        while (current_offset + i < self.dyn_buf.len() && i < chunk_size)
+        {
+            char current = self.dyn_buf[current_offset + i];
+            chunk_buf.append_char(current);
+            if (current != '\r' || current != '\n') i += 1;
         }
 
-        chunk_offset = clrf_idx + chunk_byte_len;
-        chunk_buf.append_chars(view[chunk_offset:chunk_size]);
+        current_offset += chunk_size + crlf_size;
     }
 
     response.body = chunk_buf.str_view();
-    tora::debug("response: \n%s", response.str_view());
-
 }
 
 fn usz? HTTPParser.read_sock_to_buf(&self) @private
