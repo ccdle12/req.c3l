@@ -81,10 +81,7 @@ struct Tmp
     ConditionVariable* cond;
     int ready;
     bool done;
-
-    // TODO: Does this need ot be a pointer? by copying the file descriptor...
-    // is it the same file descriptor?
-    TcpSocket* tx;
+    TcpSocket tx;
 }
 
 fn void worker_thread(Tmp* tmp)
@@ -178,7 +175,7 @@ fn void test_delayed_chunk_0() @test
     cond.init()!!;
 
     Allocator alloc = allocator::heap();
-    Tmp tmp = { .alloc = alloc, .mtx = &mtx, .cond = &cond, .ready = 0, .done = false, .tx = &tx };
+    Tmp tmp = { .alloc = alloc, .mtx = &mtx, .cond = &cond, .ready = 0, .done = false, .tx = tx };
 
     Thread log_thread;
     log_thread.create((ThreadFn) &worker_thread, &tmp)!!;
