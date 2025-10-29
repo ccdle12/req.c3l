@@ -59,37 +59,62 @@ fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline 
 fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @private
 {
     usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
+
     usz crlf_size = 2;
     DString chunk_buf = dstring::temp();
 
     bool end_chunk_found = false;
-
-    while (current_offset < self.dyn_buf.len())
+    while (!end_chunk_found)
     {
-        // TODO: Create a test to test this with a malformed &self.dyn_buf
-        DString chunk_size_str = dstring::temp();
-        while (current_offset < self.dyn_buf.len() && self.dyn_buf[current_offset] != '\r')
+        if (current_offset < self.dyn_buf.len())
         {
-            chunk_size_str.append_char(self.dyn_buf[current_offset]);
-            current_offset += 1;
+            // TODO: Create a test to test this with a malformed &self.dyn_buf
+            DString chunk_size_str = dstring::temp();
+            while (current_offset < self.dyn_buf.len() && self.dyn_buf[current_offset] != '\r')
+            {
+                chunk_size_str.append_char(self.dyn_buf[current_offset]);
+                current_offset += 1;
+            }
+
+
+            ulong? chunk_size = chunk_size_str.str_view().to_uint(base: 16);
+
+            // TODO: Write a test to check that a malformed input doesn't create
+            // an endless loop.
+            if (catch excuse = chunk_size)
+            {
+                if (current_offset >= self.dyn_buf.len())
+                {
+                    self.read_sock_to_buf()!!;
+                    continue;
+                }
+                else
+                {
+                   //TODO: Throw an error
+                    end_chunk_found = true;
+                    break;
+                }
+            }
+
+            if (chunk_size == 0)
+            {
+                end_chunk_found = true;
+                break;
+            };
+
+            current_offset += crlf_size;
+
+            // Read bytes by chunk size.
+            usz i = 0;
+            while (current_offset + i < self.dyn_buf.len() && i < chunk_size)
+            {
+                char current = self.dyn_buf[current_offset + i];
+                chunk_buf.append_char(current);
+                if (current != '\r' || current != '\n') i += 1;
+            }
+
+            current_offset += chunk_size + crlf_size;
         }
-
-        ulong? chunk_size = chunk_size_str.str_view().to_uint(base: 16);
-        // TODO: Return errors instead of just breaking
-        if (catch excuse = chunk_size) break;
-        if (chunk_size == 0) break;
-
-        current_offset += crlf_size;
-
-        usz i = 0;
-        while (current_offset + i < self.dyn_buf.len() && i < chunk_size)
-        {
-            char current = self.dyn_buf[current_offset + i];
-            chunk_buf.append_char(current);
-            if (current != '\r' || current != '\n') i += 1;
-        }
-
-        current_offset += chunk_size + crlf_size;
     }
 
     response.body = chunk_buf.str_view();
