@@ -98,15 +98,10 @@ fn void worker_thread(Tmp* tmp)
         tmp.mtx.@in_lock()
         {
             while (tmp.ready < 1 && !tmp.done) {
-                io::printn("!!!!DEBUG: worker waiting in while loop!!!!");
                 tmp.cond.wait(tmp.mtx)!!;
             }
 
-            io::printfn("!!!!DEBUG: Worker: is tmp.done true: %s !!!!", tmp.done);
             if (tmp.done) return;
-
-            io::printn("!!!!DEBUG: Worker: outside of read < 1 loop!!!!");
-            io::printfn("!!!!DEBUG: Worker: got the signal: %s!!!!", tmp.ready);
 
             String[*] delayed_chunk =
             {
@@ -122,7 +117,6 @@ fn void worker_thread(Tmp* tmp)
             defer chunk.free();
 
             foreach (&str : delayed_chunk) chunk.appendf(*str);
-            io::printfn("!!!!DEBUG: Worker: got writing the chunk to tx!!!!");
             tmp.tx.write(chunk.str_view())!!;
 
             tmp.ready = 0;
