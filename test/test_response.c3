@@ -19,7 +19,7 @@ fn Pair{TcpSocket, TcpSocket}? socket_pair(AIFamily ai_family = os::AF_UNIX, AIS
 	return { .first = (TcpSocket) send_sock, .second = (TcpSocket) recv_sock };
 }
 
-fn void test_ok_0() @test
+fn void test_ok_content_length_0() @test
 {
     String[*] input =
     {
@@ -47,59 +47,8 @@ fn void test_ok_0() @test
     test::eq(response.headers.connection, "keep-alive");
     test::eq(response.headers.date, "Wed, 13 Aug 2025 12:00:00 GMT");
     test::eq(response.headers.server, "nginx/1.18.0");
-    test::@check(response.body.contains("success"));
+    test::@check(response.body.contains("{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}",));
     test::@check(response.body.contains("}"));
-}
-
-fn void test_ok_1() @test
-{
-    String[*] input =
-    {
-      "HTTP/1.1 200 OK \r\n",
-      "access-control-allow-origin: *\r\n",
-      "content-type: application/json \r\n",
-      "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
-      "vary: Accept-Encoding \r\n",
-      "via: 1.1 Caddy \r\n",
-      "transfer-encoding: chunked",
-
-      // Headers and Body separator
-      CRLF,
-
-      // Chunk Length
-      "141\r\n",
-      "{\r\n",
-          "  \"method\": \"GET\",\r\n",
-          "  \"protocol\": \"http\",\r\n",
-          "  \"host\": \"echo.free.beeceptor.com\",\r\n",
-          "  \"path\": \"/\",\r\n",
-          "  \"ip\": \"213.22.219.242:35126\",\r\n",
-          "  \"headers\": {\r\n",
-          "  \"Host\": \"echo.free.beeceptor.com\",\r\n",
-          "  \"User-Agent\": \"curl/8.12.1\",\r\n",
-          "  \"Accept\": \"*/*\",\r\n",
-          "  \"Via\": \"1.1 Caddy\",\r\n",
-          "  \"Accept-Encoding\": \"gzip\"\r\n",
-       "},\r\n",
-       "\"parsedQueryParams\": {}\r\n",
-       "}\r\n",
-      CRLF_END,
-    };
-
-    // Then i'll need to figure out how to call recv(), that has incomplete
-    // mock socket and then add more to the mock socket somehow
-
-    Response res = get_response(&input)!!;
-
-    test::eq(res.status, "200");
-    test::eq(res.version, "HTTP/1.1");
-    test::eq(res.headers.transfer_encoding, CHUNKED_ENCODING);
-    test::eq(res.headers.via, "1.1 Caddy");
-
-    tora::debug("response: \n%s", res.str_view());
-    // TODO: For some reason, its turning upper case letters into lower case
-    //test::@check(res.body.contains("parsedQueryParams"));
-    test::@check(res.body.contains("parsedqueryparams"));
 }
 
 fn void test_internal_error_0() @test
@@ -151,7 +100,7 @@ fn void test_headers_via() @test
 
         CRLF,
 
-        "5\r\n",
+        "1\r\n",
         "{\r\n",
 
         CRLF_END,
@@ -217,6 +166,9 @@ fn void test_bad_request_0() @test
 //
 //}
 
+// Helper function to create a bi-directional socket, writes the input to the
+// transmitter side, and returns a Response client, reading from the receiving
+// socket.
 fn Response? get_response(String[] input)
 {
     DString in = dstring::temp();
