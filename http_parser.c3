@@ -61,7 +61,6 @@ fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline 
 fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @private
 {
     usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
-
     usz crlf_size = 2;
 
     DString chunk_buf;
@@ -92,18 +91,11 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
             // an endless loop.
             if (catch excuse = chunk_size)
             {
-                if (current_offset >= self.dyn_buf.len())
-                {
-                    // TODO: If I read 0, it means theres nothing more to read?
-                    // and should be an error?
-                    self.read_sock_to_buf()!;
-                    continue;
-                }
-                else
-                {
-                   //TODO: Throw an error since we have an error.
-                    return excuse?;
-                }
+                // TODO: This should mean its malformed?
+                if (current_offset < self.dyn_buf.len()) return excuse?;
+
+                self.read_sock_to_buf()!;
+                continue;
             }
 
             if (chunk_size == 0)
@@ -114,7 +106,7 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
 
             current_offset += crlf_size;
 
-            // Read bytes by chunk size.
+            // Read bytes from the buf by chunk size.
             usz i = 0;
             while (current_offset + i < self.dyn_buf.len() && i < chunk_size)
             {
@@ -135,8 +127,7 @@ fn usz? HTTPParser.read_sock_to_buf(&self) @private
     char[4096] buf;
     usz bytes_read = self.socket.read(&buf)!;
 
-    // TODO: MAYBE THIS SHOULD BE A FAILED READ?
-    //if (bytes_read == 0) return;
+    if (bytes_read == 0) return ZERO_BYTES_READ?;
 
     // TODO: bytes_read can never be greater than in_buf len?
     self.dyn_buf.append_chars((String) buf[..bytes_read]);
