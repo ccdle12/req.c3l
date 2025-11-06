@@ -74,66 +74,40 @@ fn void test_ok_chunked_1() @test
     test::@check(res.body.contains("pedia"));
 }
 
-struct Tmp
+struct TestThreadHarness
 {
-    Allocator alloc;
-    Mutex* mtx;
+    Mutex mtx;
     ConditionVariable* cond;
     int ready;
-    bool done;
     TcpSocket tx;
+    String delayed_chunk;
 }
 
-fn void worker_thread(Tmp* tmp)
+fn void TestThreadHarness.init(&self, TcpSocket tx, String delayed_chunk)
 {
-    // TODO: The threading issue was tora! its not thread safe.
-    io::printn("\n!!!!DEBUG: Worker watiing for signal!!!!");
-    while (!tmp.done)
+    Mutex mtx;
+    mtx.init()!!;
+
+    ConditionVariable cond;
+    cond.init()!!;
+
+    *self = { .mtx = mtx, .cond = &cond, .ready = 0, .tx = tx, .delayed_chunk = delayed_chunk };
+}
+
+fn void worker_thread(TestThreadHarness* test_harness)
+{
+    test_harness.mtx.@in_lock()
     {
+        while (!test_harness.ready) {
+            test_harness.cond.wait(&test_harness.mtx)!!;
+        }
 
-    io::printn("!!!!DEBUG: tmp.done while loop!!!!");
-    // TODO: SOme issue with using a temp allocation.
-    @pool_init(tmp.alloc, 1024)
-    {
-        tmp.mtx.@in_lock()
-        {
-            while (tmp.ready < 1 && !tmp.done) {
-                tmp.cond.wait(tmp.mtx)!!;
-            }
+        // Simulate a delayed chunk.
+        thread::sleep_ms(1000);
 
-            if (tmp.done) return;
-
-            String[*] delayed_chunk =
-            {
-              "5\r\n",
-              "pedia\r\n",
-              "0\r\n",
-
-              CRLF_END,
-            };
-
-            DString chunk;
-            chunk.init(tmp.alloc);
-            defer chunk.free();
-
-            foreach (&str : delayed_chunk) chunk.appendf(*str);
-            tmp.tx.write(chunk.str_view())!!;
-
-            tmp.ready = 0;
-            tmp.done = true;
-        };
+        test_harness.tx.write(test_harness.delayed_chunk)!!;
     };
-    }
 }
-
-fn void shutdown(Tmp* tmp, Thread* thread)
-{
-
-    tmp.done = true;
-    tmp.cond.signal()!!;
-    thread.join()!!;
-}
-
 
 fn void test_delayed_chunk_0() @test
 {
@@ -154,39 +128,30 @@ fn void test_delayed_chunk_0() @test
       "Wiki\r\n",
     };
 
-    DString in = dstring::temp();
-    foreach (&str : input) in.appendf(*str);
+    DString first_chunk = dstring::temp();
+    foreach (&str : input) first_chunk.appendf(*str);
 
     TcpSocket tx; TcpSocket rx;
     socket_pair()!!.unpack(&tx, &rx);
 
-    tx.write(in.str_view())!!;
+    tx.write(first_chunk.str_view())!!;
 
-    Mutex mtx;
-    mtx.init()!!;
+    String delayed_chunk = "5\r\npedia\r\n0\r\n".concat(tmem, CRLF_END);
 
-    ConditionVariable cond;
-    cond.init()!!;
+    TestThreadHarness test_harness;
+    test_harness.init(tx, delayed_chunk);
 
-    Allocator alloc = allocator::heap();
-    Tmp tmp = { .alloc = alloc, .mtx = &mtx, .cond = &cond, .ready = 0, .done = false, .tx = tx };
+    Thread test_thread;
+    test_thread.create((ThreadFn) &worker_thread, &test_harness)!!;
+    defer test_thread.join()!!;
 
-    Thread log_thread;
-    log_thread.create((ThreadFn) &worker_thread, &tmp)!!;
-    defer shutdown(&tmp, &log_thread);
-
-    mtx.@in_lock()
+    test_harness.mtx.@in_lock()
     {
-        tmp.ready = 1;
-        cond.signal()!!;
+        test_harness.ready = 1;
+        test_harness.cond.signal()!!;
     };
 
-    Response first_res = recv(rx)!!;
-    test::@check(first_res.body.contains("wiki"));
-
-    // Allow time to write to the socket.
-    thread::sleep_ms(1000);
-
-    test::@check(first_res.body.contains("pedia"));
-    test::@check(!first_res.body.contains("not contains"));
+    Response res = recv(rx)!!;
+    test::@check(res.body.contains("wiki"));
+    test::@check(res.body.contains("pedia"));
 }
