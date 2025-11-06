@@ -7,12 +7,14 @@ struct HTTPParser
 {
     DString dyn_buf;
     TcpSocket socket;
+    Allocator allocator;
 }
 
-fn void HTTPParser.init(&self, TcpSocket socket)
+fn void HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem)
 {
     self.dyn_buf = dstring::temp();
     self.socket = socket;
+    self.allocator = allocator;
 }
 
 
@@ -61,7 +63,10 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
     usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
 
     usz crlf_size = 2;
-    DString chunk_buf = dstring::temp();
+
+    DString chunk_buf;
+    chunk_buf.init(self.allocator);
+    defer chunk_buf.free();
 
     bool end_chunk_found = false;
     while (!end_chunk_found)
@@ -69,7 +74,11 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
         if (current_offset < self.dyn_buf.len())
         {
             // TODO: Create a test to test this with a malformed &self.dyn_buf
-            DString chunk_size_str = dstring::temp();
+            //DString chunk_size_str = dstring::temp();
+            DString chunk_size_str;
+            chunk_size_str.init(self.allocator);
+            defer chunk_size_str.free();
+
             while (current_offset < self.dyn_buf.len() && self.dyn_buf[current_offset] != '\r')
             {
                 chunk_size_str.append_char(self.dyn_buf[current_offset]);
@@ -85,14 +94,15 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
             {
                 if (current_offset >= self.dyn_buf.len())
                 {
-                    self.read_sock_to_buf()!!;
+                    // TODO: If I read 0, it means theres nothing more to read?
+                    // and should be an error?
+                    self.read_sock_to_buf()!;
                     continue;
                 }
                 else
                 {
-                   //TODO: Throw an error
-                    end_chunk_found = true;
-                    break;
+                   //TODO: Throw an error since we have an error.
+                    return excuse?;
                 }
             }
 
