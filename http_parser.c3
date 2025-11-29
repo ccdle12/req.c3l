@@ -1,19 +1,32 @@
 module req;
 
 import std::net::tcp;
+import std::net;
 import tora;
+
+faultdef TIMEOUT;
 
 struct HTTPParser
 {
-    DString dyn_buf;
     TcpSocket socket;
+    usz poll_ms_timeout;
+    Poll[1] polls;
     Allocator allocator;
+    DString dyn_buf;
 }
 
-fn void HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem)
+fn void HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz timeout_ms=30000)
 {
     self.dyn_buf = dstring::temp();
     self.socket = socket;
+
+    // TODO: Maybe should rethrow error.
+    self.socket.sock.set_non_blocking(true)!!;
+    Poll sock_poll = { .events = net::PollSubscribe.ANY_READ, .socket = self.socket.sock };
+    Poll[1] polls = { sock_poll };
+    self.polls = polls;
+    self.poll_ms_timeout = timeout_ms;
+
     self.allocator = allocator;
 }
 
@@ -67,13 +80,11 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
     chunk_buf.init(self.allocator);
     defer chunk_buf.free();
 
-    bool end_chunk_found = false;
+    bool end_chunk_found;
     while (!end_chunk_found)
     {
         if (current_offset < self.dyn_buf.len())
         {
-            // TODO: Create a test to test this with a malformed &self.dyn_buf
-            //DString chunk_size_str = dstring::temp();
             DString chunk_size_str;
             chunk_size_str.init(self.allocator);
             defer chunk_size_str.free();
@@ -86,15 +97,17 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
 
 
             ulong? chunk_size = chunk_size_str.str_view().to_uint(base: 16);
-
-            // TODO: Write a test to check that a malformed input doesn't create
-            // an endless loop.
             if (catch excuse = chunk_size)
             {
-                // TODO: This should mean its malformed?
+                // We have a malformed body, since we were expecting the start of
+                // the next chunk size.
                 if (current_offset < self.dyn_buf.len()) return excuse?;
 
+                // We reached the end of the current dyn_buf, the malformed char
+                // could indicate we are missing more chunks, read from the socket
+                // to see if there is more of the body available to read.
                 self.read_sock_to_buf()!;
+
                 continue;
             }
 
@@ -125,13 +138,15 @@ fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @privat
 fn usz? HTTPParser.read_sock_to_buf(&self) @private
 {
     char[4096] buf;
-    usz bytes_read = self.socket.read(&buf)!;
 
+    ulong poll_res = net::poll_ms(&self.polls, self.poll_ms_timeout)!;
+    if (poll_res == 0) return TIMEOUT?;
+
+    usz bytes_read = self.socket.read(&buf)!;
     if (bytes_read == 0) return ZERO_BYTES_READ?;
 
     // TODO: bytes_read can never be greater than in_buf len?
     self.dyn_buf.append_chars((String) buf[..bytes_read]);
 
     return bytes_read;
-
 }
