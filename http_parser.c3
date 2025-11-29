@@ -7,10 +7,10 @@ faultdef TIMEOUT;
 
 struct HTTPParser
 {
+    Allocator allocator;
     TcpSocket socket;
     usz poll_ms_timeout;
     Poll[1] polls;
-    Allocator allocator;
     DString dyn_buf;
 }
 
