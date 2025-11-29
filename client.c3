@@ -9,7 +9,7 @@ fn Response? recv(TcpSocket socket, usz timeout_ms=30000)
     Response response;
 
     HTTPParser parser;
-    parser.init(socket, tmem, timeout_ms);
+    parser.init(socket, tmem, timeout_ms)!;
 
     parser.read_headers(&response)!;
     parser.read_body(&response)!;

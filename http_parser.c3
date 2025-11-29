@@ -14,13 +14,13 @@ struct HTTPParser
     DString dyn_buf;
 }
 
-fn void HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz timeout_ms=30000)
+fn void? HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz timeout_ms=30000)
 {
     self.dyn_buf = dstring::temp();
     self.socket = socket;
 
     // TODO: Maybe should rethrow error.
-    self.socket.sock.set_non_blocking(true)!!;
+    self.socket.sock.set_non_blocking(true)!;
     Poll sock_poll = { .events = net::PollSubscribe.ANY_READ, .socket = self.socket.sock };
     Poll[1] polls = { sock_poll };
     self.polls = polls;
