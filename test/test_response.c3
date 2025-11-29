@@ -5,20 +5,6 @@ import std::net::tcp;
 import std::collections;
 import std::net::os;
 
-extern fn isz socketpair(CInt domain, CInt type, CInt protocol, CInt[2]* sv);
-
-fn Pair{TcpSocket, TcpSocket}? socket_pair(AIFamily ai_family = os::AF_UNIX, AISockType ai_socktype = os::SOCK_STREAM)
-{
-	CInt[2] sockets;
-	isz n = socketpair((CInt) ai_family, (CInt) ai_socktype, 0, &sockets);
-	if (n < 0) return os::socket_error()?;
-
-	Socket send_sock = { .sock = (net::os::NativeSocket) sockets[0] };
-	Socket recv_sock = { .sock = (net::os::NativeSocket) sockets[1] };
-
-	return { .first = (TcpSocket) send_sock, .second = (TcpSocket) recv_sock };
-}
-
 fn void test_ok_content_length_0() @test
 {
     String[*] input =
@@ -143,28 +129,17 @@ fn void test_bad_request_0() @test
     test::@check(res.body.contains("400 bad request"));
 }
 
-// TODO: I think the client needs to send a timer and timeout and this test should
-// handle this.
-//fn void test_empty_request() @test
-//{
-//    String[*] input =
- //   {
-//      "",
-//    };
-//
-//    // TODO: Need to rethink if reading 0 bytes is an error or just a return.
-//    Response? res = get_response(&input);
-//    if (catch error = res)
-//    {
-//        test::eq(error, ZERO_BYTES_READ);
- //   }
-//
-//    //test::eq(res.version, "");
-//    //test::eq(res.status, "");
-//    //test::eq(res.headers.connection, "");
-//    //test::eq(res.body, "");
-//
-//}
+// An empty request should lead to a timeout.
+fn void test_empty_request() @test
+{
+    String[*] input =
+   {
+      "",
+    };
+
+   fault excuse = @catch(get_response(&input, 200));
+   test::@check(excuse == TIMEOUT);
+}
 
 // Helper function to create a bi-directional socket, writes the input to the
 // transmitter side, and returns a Response client, reading from the receiving
@@ -174,10 +149,10 @@ fn Response? get_response(String[] input, usz timeout_ms=30000)
     DString in = dstring::temp();
     foreach (&str : input) in.appendf(*str);
 
-    TcpSocket tx; TcpSocket rx;
-    socket_pair()!!.unpack(&tx, &rx);
+    TcpSocketPair socket_pair;
+    socket_pair.init()!;
 
-    tx.write(in.str_view())!!;
+    socket_pair.send.write(in.str_view())!;
 
-    return recv(rx, timeout_ms);
+    return recv(socket_pair.recv, timeout_ms);
 }
