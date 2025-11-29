@@ -65,11 +65,7 @@ fn void test_internal_error_0() @test
     test::eq(response.headers.connection, "keep-alive");
     test::eq(response.headers.date, "Wed, 13 Aug 2025 12:00:00 GMT");
     test::eq(response.headers.server, "nginx/1.18.0");
-    test::@check(response.body.contains("Internal Server Error"));
-
-    // TODO: Probably off by one or something.
-    // TODO: Maybe with clrf offset, need to keep going?
-    //test::@check(response.body.contains("}"));
+    test::@check(response.body.contains("{\"error\": \"Internal Server Error\",\"message\": \"Something went wrong\"}"));
 }
 
 fn void test_headers_via() @test
