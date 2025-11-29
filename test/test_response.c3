@@ -169,7 +169,7 @@ fn void test_bad_request_0() @test
 // Helper function to create a bi-directional socket, writes the input to the
 // transmitter side, and returns a Response client, reading from the receiving
 // socket.
-fn Response? get_response(String[] input)
+fn Response? get_response(String[] input, usz timeout_ms=30000)
 {
     DString in = dstring::temp();
     foreach (&str : input) in.appendf(*str);
@@ -179,5 +179,5 @@ fn Response? get_response(String[] input)
 
     tx.write(in.str_view())!!;
 
-    return recv(rx);
+    return recv(rx, timeout_ms);
 }
