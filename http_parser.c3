@@ -46,7 +46,6 @@ fn void? HTTPParser.read_body(&self, Response* response)
     switch(response.body_type)
     {
         case NONE:
-            // TODO: NEED TO HANDLE THIS AS A FAILED PARSE
             return ZERO_BYTES_READ?;
         case CONTENT_LENGTH:
             self.read_content_length_body(response)!;
