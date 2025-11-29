@@ -19,7 +19,6 @@ fn void? HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz 
     self.dyn_buf = dstring::temp();
     self.socket = socket;
 
-    // TODO: Maybe should rethrow error.
     self.socket.sock.set_non_blocking(true)!;
     Poll sock_poll = { .events = net::PollSubscribe.ANY_READ, .socket = self.socket.sock };
     Poll[1] polls = { sock_poll };
