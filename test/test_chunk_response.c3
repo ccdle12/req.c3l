@@ -131,15 +131,15 @@ fn void test_delayed_chunk_0() @test
     DString first_chunk = dstring::temp();
     foreach (&str : input) first_chunk.appendf(*str);
 
-    TcpSocket tx; TcpSocket rx;
-    socket_pair()!!.unpack(&tx, &rx);
+    TcpSocketPair socket_pair;
+    socket_pair.init()!!;
 
-    tx.write(first_chunk.str_view())!!;
+    socket_pair.send.write(first_chunk.str_view())!!;
 
     String delayed_chunk = "5\r\npedia\r\n0\r\n".concat(tmem, CRLF_END);
 
     TestThreadHarness test_harness;
-    test_harness.init(tx, delayed_chunk);
+    test_harness.init(socket_pair.send, delayed_chunk);
 
     Thread test_thread;
     test_thread.create((ThreadFn) &worker_thread, &test_harness)!!;
@@ -151,7 +151,7 @@ fn void test_delayed_chunk_0() @test
         test_harness.cond.signal()!!;
     };
 
-    Response res = recv(rx)!!;
+    Response res = recv(socket_pair.recv)!!;
     test::@check(res.body.contains("wiki"));
     test::@check(res.body.contains("pedia"));
 }
