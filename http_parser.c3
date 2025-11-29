@@ -2,7 +2,6 @@ module req;
 
 import std::net::tcp;
 import std::net;
-import tora;
 
 faultdef TIMEOUT;
 
