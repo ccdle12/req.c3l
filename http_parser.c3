@@ -16,7 +16,7 @@ struct HTTPParser
 
 fn void? HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz timeout_ms=30000)
 {
-    self.dyn_buf = dstring::temp();
+    self.allocator = allocator;
     self.socket = socket;
 
     self.socket.sock.set_non_blocking(true)!;
@@ -25,7 +25,10 @@ fn void? HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz 
     self.polls = polls;
     self.poll_ms_timeout = timeout_ms;
 
-    self.allocator = allocator;
+    // TODO: 2025.11.29
+    // - Allocate dyn_buf using the allocator passed
+    // - Create a function to free the dyn_buf
+    self.dyn_buf = dstring::temp();
 }
 
 
@@ -70,66 +73,68 @@ fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline 
 
 fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @private
 {
-    usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
-    usz crlf_size = 2;
-
     DString chunk_buf;
     chunk_buf.init(self.allocator);
     defer chunk_buf.free();
 
-    bool end_chunk_found;
-    while (!end_chunk_found)
+    usz current_offset = find_end_of_crlf(&self.dyn_buf)!;
+
+    while (true)
     {
-        if (current_offset < self.dyn_buf.len())
+        ulong? chunk_size = self.read_chunk_size(&current_offset);
+        if (catch excuse = chunk_size)
         {
-            DString chunk_size_str;
-            chunk_size_str.init(self.allocator);
-            defer chunk_size_str.free();
+            // We have a malformed chunk. This fails because we are expecting
+            // to read a chunk size str.
+            if (current_offset < self.dyn_buf.len()) return excuse?;
 
-            while (current_offset < self.dyn_buf.len() && self.dyn_buf[current_offset] != '\r')
-            {
-                chunk_size_str.append_char(self.dyn_buf[current_offset]);
-                current_offset += 1;
-            }
+            // We reached the end of the current dyn_buf, the malformed char
+            // could indicate we are missing more chunks, read from the socket
+            // to see if there is more of the body available to read.
+            self.read_sock_to_buf()!;
 
-
-            ulong? chunk_size = chunk_size_str.str_view().to_uint(base: 16);
-            if (catch excuse = chunk_size)
-            {
-                // We have a malformed body, since we were expecting the start of
-                // the next chunk size.
-                if (current_offset < self.dyn_buf.len()) return excuse?;
-
-                // We reached the end of the current dyn_buf, the malformed char
-                // could indicate we are missing more chunks, read from the socket
-                // to see if there is more of the body available to read.
-                self.read_sock_to_buf()!;
-
-                continue;
-            }
-
-            if (chunk_size == 0)
-            {
-                end_chunk_found = true;
-                break;
-            };
-
-            current_offset += crlf_size;
-
-            // Read bytes from the buf by chunk size.
-            usz i = 0;
-            while (current_offset + i < self.dyn_buf.len() && i < chunk_size)
-            {
-                char current = self.dyn_buf[current_offset + i];
-                chunk_buf.append_char(current);
-                if (current != '\r' || current != '\n') i += 1;
-            }
-
-            current_offset += chunk_size + crlf_size;
+            continue;
         }
+
+        if (chunk_size == 0) break;
+
+        self.read_sub_chunk(&chunk_buf, &current_offset, chunk_size);
     }
 
     response.body = chunk_buf.str_view();
+}
+
+fn ulong? HTTPParser.read_chunk_size(&self, usz* current_offset) @private
+{
+    DString chunk_size_str;
+    chunk_size_str.init(self.allocator);
+    defer chunk_size_str.free();
+
+    while (*current_offset < self.dyn_buf.len() && self.dyn_buf[*current_offset] != '\r')
+    {
+        chunk_size_str.append_char(self.dyn_buf[*current_offset]);
+        *current_offset += 1;
+    }
+
+    return chunk_size_str.str_view().to_uint(base: 16);
+}
+
+fn void HTTPParser.read_sub_chunk(&self, DString* chunk_buf, usz* current_offset, ulong chunk_size) @private
+{
+    usz crlf_size = 2;
+
+    *current_offset += crlf_size;
+
+    // Read bytes from the buf by chunk size.
+    usz i = 0;
+    while (*current_offset + i < self.dyn_buf.len() && i < chunk_size)
+    {
+        char current = self.dyn_buf[*current_offset + i];
+        chunk_buf.append_char(current);
+        if (current != '\r' || current != '\n') i += 1;
+    }
+
+    *current_offset += chunk_size + crlf_size;
 }
 
 fn usz? HTTPParser.read_sock_to_buf(&self) @private
