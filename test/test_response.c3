@@ -150,5 +150,5 @@ fn Response? get_response(String[] input, usz timeout_ms=30000)
 
     socket_pair.send.write(in.str_view())!;
 
-    return recv(socket_pair.recv, timeout_ms);
+    return recv(socket_pair.recv, tmem, timeout_ms);
 }
