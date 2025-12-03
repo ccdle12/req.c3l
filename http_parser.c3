@@ -28,9 +28,13 @@ fn void? HTTPParser.init(&self, TcpSocket socket, Allocator allocator=tmem, usz 
     // TODO: 2025.11.29
     // - Allocate dyn_buf using the allocator passed
     // - Create a function to free the dyn_buf
-    self.dyn_buf = dstring::temp();
+    self.dyn_buf.init(self.allocator);
 }
 
+fn void HTTPParser.free(&self)
+{
+    self.dyn_buf.free();
+}
 
 fn void? HTTPParser.read_headers(&self, Response* response)
 {
