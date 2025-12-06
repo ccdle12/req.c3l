@@ -8,7 +8,8 @@ faultdef INVALID_PROTOCOL_VERSION,
          MISSING_STATUS_CODE,
          MISSING_CRLF,
          MALFORMED_HEADER,
-         INVALID_HEADER_KEY;
+         INVALID_HEADER_KEY_SYMBOL,
+         INVALID_WHITE_SPACE_IN_HEADER;
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
@@ -84,12 +85,14 @@ fn void? Response.parse_headers(&self, String[] headers)
     foreach(&header : headers)
     {
         String[] kv = header.split(self.allocator, ":", 2);
-        String key = kv[0].trim().to_lower_copy(self.allocator);
+
+        String key = kv[0].to_lower_copy(self.allocator);
+        if (key.contains(" ")) return INVALID_WHITE_SPACE_IN_HEADER?;
 
         io::printfn("key: %s", key);
         foreach(c : key)
         {
-            if (!is_tchar(c)) return INVALID_HEADER_KEY?;
+            if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL?;
         }
 
         self.headers.set(key, kv[1].trim());

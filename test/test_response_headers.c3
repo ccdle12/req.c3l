@@ -128,7 +128,7 @@ fn void test_invalid_header(String invalid_header_line)
     response.tinit();
 
     fault excuse = @catch(response.parse_header(input));
-    test::eq(excuse, INVALID_HEADER_KEY);
+    test::eq(excuse, INVALID_HEADER_KEY_SYMBOL);
 }
 
 fn void test_invalid_header_key_symbols() @test
@@ -140,13 +140,41 @@ fn void test_invalid_header_key_symbols() @test
         "Connec@ion: keep-alive",   // Invalid character '@'
         "Connec[ion: keep-alive",   // Invalid character '['
         "Connec]ion: keep-alive",   // Invalid character ']'
-        "Connection{ keep-alive",   // Invalid character '{'
-        "Connection} keep-alive"   // Invalid character '}'
+        "Connection{: keep-alive",   // Invalid character '{'
+        "Connection}: keep-alive"   // Invalid character '}'
     };
 
     foreach (&header : invalid_headers)
     {
         test_invalid_header(*header);
     }
+}
 
+fn void test_invalid_whitespace_in_header() @test
+{
+
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type : application/json \r\n"
+        "\r\n\r\n";
+
+    Response response;
+    response.tinit();
+
+    fault excuse = @catch(response.parse_header(input));
+    test::eq(excuse, INVALID_WHITE_SPACE_IN_HEADER);
+}
+
+fn void test_invalid_line_termination() @test
+{
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type: application/json \n"
+        "\r\n\r\n";
+
+    Response response;
+    response.tinit();
+
+    fault excuse = @catch(response.parse_header(input));
+    test::eq(excuse, INVALID_WHITE_SPACE_IN_HEADER);
 }
