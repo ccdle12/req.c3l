@@ -18,6 +18,30 @@ fn void test_incomplete_header() @test
     test::eq(parser.state, ParserState.HEADER);
 }
 
+fn void test_with_allocator() @test
+{
+    String input =
+      "HTTP/1.1 200 OK \r\n"
+      "access-control-allow-origin: *\r\n"
+      "content-type: application/json \r\n"
+      "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
+      "vary: Accept-Encoding \r\n"
+      "via: 1.1 Caddy \r\n"
+      "transfer-encoding: chunked \r\n"
+      "\r\n";
+
+    LibcAllocator alloc;
+
+    Parser parser;
+    parser.init(&alloc);
+    defer parser.free();
+
+    ParserState state = parser.step(input)!!;
+
+    // We should have moved to the header state but we need more bytes.
+    test::eq(state, ParserState.BODY);
+}
+
 fn void test_full_header() @test
 {
     String input =

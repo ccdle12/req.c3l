@@ -45,15 +45,18 @@ fn void Response.init(&self, Allocator allocator)
     self.headers.init(self.allocator);
 }
 
-fn void Response.tinit(&self)
+fn void Response.tinit(&self) => self.init(tmem);
+
+fn void Response.free(&self)
 {
-    self.allocator = tmem;
-    self.headers.init(self.allocator);
+    self.headers.free();
 }
 
 fn void? Response.parse_status_line(&self, String header_status_line)
 {
     String[] status_line = header_status_line.split(self.allocator, " ", 3);
+    defer allocator::free(self.allocator, status_line);
+
     if (status_line.len <= 1) return MALFORMED_STATUS_LINE?;
 
     if (status_line[0] != HTTP11 && status_line[0] != HTTP10)
@@ -78,9 +81,13 @@ fn void? Response.parse_status_line(&self, String header_status_line)
 fn void? Response.parse_header_line(&self, String header_line)
 {
     String[] kv = header_line.split(self.allocator, ":", 2);
+    defer allocator::free(self.allocator, kv);
+
     if (kv.len < 2) return MALFORMED_HEADER?;
 
     String key = kv[0].to_lower_copy(self.allocator);
+    defer allocator::free(self.allocator, key);
+
     if (key[key.len - 1] == ' ') return INVALID_TRAILING_SPACE?;
 
     foreach(c : key)
@@ -94,6 +101,8 @@ fn void? Response.parse_header_line(&self, String header_line)
 fn String*? Response.get_header_ref(&self, String key)
 {
     String k = key.trim().to_lower_copy(self.allocator);
+    defer allocator::free(self.allocator, k);
+
     return self.headers.get_ref(k)!;
 }
 

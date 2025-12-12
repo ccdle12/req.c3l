@@ -28,11 +28,19 @@ struct Parser
     Response response;
 }
 
-fn void Parser.tinit(&self)
+fn void Parser.init(&self, Allocator allocator)
 {
-    self.allocator = tmem;
+    self.allocator = allocator;
     self.buf.init(self.allocator, MAX_SIZE, INITIAL_CAPACITY);
     self.response.init(self.allocator);
+}
+
+fn void Parser.tinit(&self) => self.init(tmem);
+
+fn void Parser.free(&self)
+{
+   self.buf.free();
+   self.response.free();
 }
 
 fn ParserState? Parser.step(&self, char[] input)
