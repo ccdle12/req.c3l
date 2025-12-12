@@ -5,9 +5,8 @@ import std::net;
 import std::io;
 import tora;
 
-faultdef TIMEOUT;
 
-enum ParserState
+enum ParserStateBackup
 {
     START,
     HEADER_DONE,
@@ -16,18 +15,18 @@ enum ParserState
     REQUEST_MORE,
 }
 
-enum BodyType
+enum ParserState
 {
-    NULL,
-    CHUNKED,
-    CONTENT_LENGTH,
+    STATUS_LINE,
+    HEADER,
+    HEADER_READ,
+    HEADER_PROGRESS,
+    BODY,
+    COMPLETE,
+    REQUEST_MORE,
+    EOF,
 }
 
-// TODO: Maybe make this a kv.
-struct Headers
-{
-    String host;
-}
 
 struct Parser
 {
@@ -41,7 +40,8 @@ const usz MAX_SIZE = 4096;
 const usz INITIAL_CAPACITY = 4096;
 const char[] CRLF = "\r\n\r\n";
 
-faultdef CRLF_NOT_FOUND;
+faultdef CRLF_NOT_FOUND,
+         MALFORMED_CRLF;
 
 fn void Parser.tinit(&self)
 {
@@ -50,49 +50,134 @@ fn void Parser.tinit(&self)
     self.response.init(self.allocator);
 }
 
-fn ParserState Parser.step(&self, char[] input)
+fn ParserState? Parser.step_status_line(&self, usz* idx)
 {
+    usz clrf_offset = 2;
+
+    // Check for a malformed CLRF. This is for a lone LF.
+    if (self.buf.bytes[*idx] == '\n')
+    {
+        if (*idx == 0 || self.buf.bytes[*idx - 1] != '\r')
+        {
+            return MALFORMED_CRLF?;
+        }
+    }
+
+    // We've reached EOF without finding the full CRLF - request more bytes.
+    if (*idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
+
+    // We've identified the CR, parse the next byte for LF, we've already
+    // done the check above for EOF.
+    if (self.buf.bytes[*idx] == '\r')
+    {
+        if (*idx + 1 < self.buf.write_idx && self.buf.bytes[*idx + 1] != '\n')
+        {
+            return MALFORMED_CRLF?;
+        }
+
+        String line = (String) self.buf.bytes[self.buf.read_idx..*idx];
+        self.response.parse_status_line(line)!;
+        self.state = HEADER;
+
+        *idx += clrf_offset;
+        self.buf.read_idx = *idx;
+    }
+
+    return self.state;
+
+}
+fn ParserState? Parser.step_headers(&self, usz* idx)
+{
+    usz clrf_offset = 2;
+
+    if (
+        self.buf.bytes[*idx] == '\r' &&
+        self.buf.bytes[*idx + 1] == '\n' &&
+        self.buf.bytes[*idx - 2] == '\r' &&
+        self.buf.bytes[*idx - 1] == '\n'
+    )
+    {
+        self.state = BODY;
+        return self.state;
+    }
+
+    if (*idx >= (self.buf.write_idx - 1))
+    {
+        // We have a malformed CRLF, we have the LF without a previous CR which
+        // would indicate a double crlf.
+        if (self.buf.bytes[*idx] == '\n' && self.buf.bytes[*idx - 1] != '\r')
+        {
+            return MALFORMED_CRLF?;
+        }
+
+        return REQUEST_MORE;
+    }
+
+    if (self.buf.bytes[*idx] == '\r')
+    {
+        if (self.buf.bytes[*idx + 1] != '\n') return MALFORMED_CRLF?;
+
+        // We found the clrf, read the single header.
+        String line = (String) self.buf.bytes[self.buf.read_idx..*idx];
+        self.response.parse_header_line(line)!;
+
+        *idx += clrf_offset;
+        self.buf.read_idx = *idx;
+
+        if (*idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
+        return HEADER_READ;
+    }
+
+    return HEADER_PROGRESS;
+}
+fn ParserState? Parser.step(&self, char[] input)
+{
+    if (input.len == 0) return EOF;
+
+    self.buf.write(input)!!;
+
+    // TODO: Exract to a const file.
+    usz clrf_offset = 2;
+
+    usz idx = self.buf.read_idx;
+    while (idx < self.buf.write_idx)
+    {
     switch(self.state)
     {
-        case START:
-            if (catch excuse = self.read_header(input))
+        case STATUS_LINE:
+            ParserState status_line_step = self.step_status_line(&idx)!;
+
+            if (status_line_step == REQUEST_MORE) return status_line_step;
+            if (status_line_step == HEADER) break;
+
+            idx++;
+
+        case HEADER:
+            ParserState header_step = self.step_headers(&idx)!;
+
+            if (header_step == HEADER_READ) continue;
+            if (header_step == HEADER_PROGRESS) idx++;
+            if (header_step == REQUEST_MORE) return header_step;
+            if (header_step == BODY)
             {
-                if (excuse == CRLF_NOT_FOUND) return REQUEST_MORE;
+                self.response.parse_body_type();
+                break;
             }
 
-            self.state = HEADER_DONE;
-            return self.state;
-
-        case HEADER_DONE:
-            self.state = BODY_CHUNKED;
-            return self.state;
-
-        case BODY_CHUNKED:
-            self.state = COMPLETE;
+        case BODY:
+            //self.state = COMPLETE;
             return self.state;
 
         default:
             return self.state;
     }
-}
-
-// TODO: Maybe after reading until crlf_idx and writing to buf and then pass
-// to response to parse the header.
-fn void? Parser.read_header(&self, char[] input) @private
-{
-    if (!self.contains_crlf(input))
-    {
-        self.buf.write(input)!;
-        return CRLF_NOT_FOUND?;
     }
 
-    usz crlf_idx = self.find_end_of_crlf(input)!;
-    self.buf.write(input[:crlf_idx])!;
+    if (self.state != COMPLETE) return REQUEST_MORE;
 
-    self.response.parse_header(self.buf_str_view())!;
-
-
+    return self.state;
 }
+
 
 fn bool Parser.contains_crlf(&self, char[] input) @private
 {
@@ -108,6 +193,8 @@ fn usz? Parser.find_end_of_crlf(&self, char[] input) @private
 
 fn String Parser.buf_str_view(&self)
 {
-    usz end_idx = self.buf.write_idx - self.buf.read_idx;
-    return (String) self.buf.bytes[0:end_idx];
+    //usz end_idx = self.buf.write_idx - self.buf.read_idx;
+    //tora::debug("end idx: %d", end_idx);
+    //return (String) self.buf.bytes[0:end_idx];
+    return (String) self.buf.bytes;
 }

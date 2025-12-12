@@ -10,7 +10,7 @@ fn void test_status_line_ok() @test
    response.parse_status_line(input)!!;
 
    test::eq(response.http_version, "HTTP/1.1");
-   test::eq(response.status_code, "200");
+   test::eq(response.status_code, 200);
    test::eq(response.reason_phrase, "OK");
 }
 
@@ -19,11 +19,13 @@ fn void test_status_line_ok() @test
 fn void test_missing_reason_phrase() @test
 {
     String input =
-      "HTTP/1.1 200\r\n";
+      "HTTP/1.1 200 \r\n";
 
    Response response;
    response.init(tmem);
    response.parse_status_line(input)!!;
+
+   test::eq(response.status_code, 200);
 }
 
 fn void test_incorrect_http_version() @test
@@ -40,7 +42,7 @@ fn void test_incorrect_http_version() @test
 fn void test_http_10_version() @test
 {
     String input =
-      "HTTP/1.0 200\r\n";
+      "HTTP/1.0 200 \r\n";
 
    Response response;
    response.init(tmem);
@@ -57,10 +59,9 @@ fn void test_missing_status_code() @test
    Response response;
    response.init(tmem);
    fault excuse = @catch(response.parse_status_line(input));
-   test::eq(excuse, MISSING_STATUS_CODE);
+   test::eq(excuse, MALFORMED_STATUS_LINE);
 }
 
-// TODO: Right now, it rethrows but probably not the correct error.
 fn void test_missing_carriage_return() @test
 {
     String input =
@@ -69,5 +70,5 @@ fn void test_missing_carriage_return() @test
    Response response;
    response.init(tmem);
    fault excuse = @catch(response.parse_status_line(input));
-   test::eq(excuse, MISSING_STATUS_CODE);
+   test::eq(excuse, MALFORMED_STATUS_LINE);
 }
