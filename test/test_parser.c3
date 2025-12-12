@@ -37,12 +37,12 @@ fn void test_full_header() @test
     test::eq(parser.state, ParserState.BODY);
     test::@check(parser.buf_str_view().contains(input));
 
-    test::eq(parser.response.get_header("access-control-allow-origin")!!, "*");
-    test::eq(parser.response.get_header("content-type")!!, "application/json");
-    test::eq(parser.response.get_header("date")!!, "Sat, 16 Aug 2025 21:48:49 GMT");
-    test::eq(parser.response.get_header("vary")!!, "Accept-Encoding");
-    test::eq(parser.response.get_header("via")!!, "1.1 Caddy");
-    test::eq(parser.response.get_header("transfer-encoding")!!, "chunked");
+    test::eq(*parser.response.get_header_ref("access-control-allow-origin")!!, "*");
+    test::eq(*parser.response.get_header_ref("content-type")!!, "application/json");
+    test::eq(*parser.response.get_header_ref("date")!!, "Sat, 16 Aug 2025 21:48:49 GMT");
+    test::eq(*parser.response.get_header_ref("vary")!!, "Accept-Encoding");
+    test::eq(*parser.response.get_header_ref("via")!!, "1.1 Caddy");
+    test::eq(*parser.response.get_header_ref("transfer-encoding")!!, "chunked");
 }
 
 fn void test_incremental_read() @test

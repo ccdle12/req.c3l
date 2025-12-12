@@ -1,11 +1,8 @@
 module req;
 
-import tora;
-import std::io;
 import std::collections::map;
 
 faultdef INVALID_PROTOCOL_VERSION,
-         MISSING_STATUS_CODE,
          MISSING_CRLF,
          MALFORMED_HEADER,
          INVALID_HEADER_KEY_SYMBOL,
@@ -25,22 +22,6 @@ enum BodyType
     CONTENT_LENGTH,
 }
 
-struct ResponseBackup
-{
-    Allocator allocator;
-
-    // Status Line.
-    String http_version;
-    String status_code;
-
-    // Optional according to RFC 9112.
-    String reason_phrase;
-
-    LinkedHashMap{String, String} headers;
-    BodyType body_type;
-    String body;
-}
-
 struct Response
 {
     Allocator allocator;
@@ -56,33 +37,6 @@ struct Response
 
     BodyType body_type;
     String body;
-}
-
-// TODO: Maybe return ref instead?
-fn String? Response.get_header(&self, String key)
-{
-    // TODO: Where is the error thrown?
-    String k = key.trim().to_lower_copy(self.allocator);
-    return self.headers.get(k)!;
-}
-
-<* According to RFC9112 6.1:
-   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
-   over Content-Length.
-*>
-fn void Response.parse_body_type(&self)
-{
-    fault content_length_excuse = @catch(self.headers.get(CONTENT_LENGTH));
-    if (!content_length_excuse)
-    {
-        self.body_type = CONTENT_LENGTH;
-    }
-
-    fault chunked_excuse = @catch(self.headers.get(TRANSFER_ENCODING));
-    if (!chunked_excuse)
-    {
-        self.body_type = CHUNKED;
-    }
 }
 
 fn void Response.init(&self, Allocator allocator)
@@ -107,7 +61,6 @@ fn void? Response.parse_status_line(&self, String header_status_line)
         return INVALID_PROTOCOL_VERSION?;
     }
     self.http_version = status_line[0];
-    tora::debug("http_version: %s", self.http_version);
 
     if (status_line[1].len != 3) return INVALID_STATUS_CODE?;
     foreach (c : status_line[1])
@@ -136,4 +89,29 @@ fn void? Response.parse_header_line(&self, String header_line)
     }
 
     self.headers.set(key, kv[1].trim());
+}
+
+fn String*? Response.get_header_ref(&self, String key)
+{
+    String k = key.trim().to_lower_copy(self.allocator);
+    return self.headers.get_ref(k)!;
+}
+
+<* According to RFC9112 6.1:
+   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
+   over Content-Length.
+*>
+fn void Response.parse_body_type(&self)
+{
+    fault content_length_excuse = @catch(self.headers.get(CONTENT_LENGTH));
+    if (!content_length_excuse)
+    {
+        self.body_type = CONTENT_LENGTH;
+    }
+
+    fault chunked_excuse = @catch(self.headers.get(TRANSFER_ENCODING));
+    if (!chunked_excuse)
+    {
+        self.body_type = CHUNKED;
+    }
 }

@@ -1,19 +1,12 @@
 module req;
 
-import std::net::tcp;
-import std::net;
 import std::io;
-import tora;
 
+const usz MAX_SIZE = 4096;
+const usz INITIAL_CAPACITY = 4096;
+const usz CRLF_OFFSET = 2;
 
-enum ParserStateBackup
-{
-    START,
-    HEADER_DONE,
-    BODY_CHUNKED,
-    COMPLETE,
-    REQUEST_MORE,
-}
+faultdef MALFORMED_CRLF;
 
 enum ParserState
 {
@@ -27,7 +20,6 @@ enum ParserState
     EOF,
 }
 
-
 struct Parser
 {
     Allocator allocator;
@@ -36,13 +28,6 @@ struct Parser
     Response response;
 }
 
-const usz MAX_SIZE = 4096;
-const usz INITIAL_CAPACITY = 4096;
-const char[] CRLF = "\r\n\r\n";
-
-faultdef CRLF_NOT_FOUND,
-         MALFORMED_CRLF;
-
 fn void Parser.tinit(&self)
 {
     self.allocator = tmem;
@@ -50,10 +35,53 @@ fn void Parser.tinit(&self)
     self.response.init(self.allocator);
 }
 
+fn ParserState? Parser.step(&self, char[] input)
+{
+    if (input.len == 0) return EOF;
+
+    self.buf.write(input)!!;
+
+    usz idx = self.buf.read_idx;
+    while (idx < self.buf.write_idx)
+    {
+        switch(self.state)
+        {
+            case STATUS_LINE:
+                ParserState status_line_step = self.step_status_line(&idx)!;
+
+                if (status_line_step == REQUEST_MORE) return status_line_step;
+                if (status_line_step == HEADER) break;
+
+                idx++;
+
+            case HEADER:
+                ParserState header_step = self.step_headers(&idx)!;
+
+                if (header_step == HEADER_READ) continue;
+                if (header_step == HEADER_PROGRESS) idx++;
+                if (header_step == REQUEST_MORE) return header_step;
+                if (header_step == BODY)
+                {
+                    self.response.parse_body_type();
+                    break;
+                }
+
+            case BODY:
+                //self.state = COMPLETE;
+                return self.state;
+
+            default:
+                return self.state;
+        }
+    }
+
+    if (self.state != COMPLETE) return REQUEST_MORE;
+
+    return self.state;
+}
+
 fn ParserState? Parser.step_status_line(&self, usz* idx)
 {
-    usz clrf_offset = 2;
-
     // Check for a malformed CLRF. This is for a lone LF.
     if (self.buf.bytes[*idx] == '\n')
     {
@@ -79,7 +107,7 @@ fn ParserState? Parser.step_status_line(&self, usz* idx)
         self.response.parse_status_line(line)!;
         self.state = HEADER;
 
-        *idx += clrf_offset;
+        *idx += CRLF_OFFSET;
         self.buf.read_idx = *idx;
     }
 
@@ -88,8 +116,6 @@ fn ParserState? Parser.step_status_line(&self, usz* idx)
 }
 fn ParserState? Parser.step_headers(&self, usz* idx)
 {
-    usz clrf_offset = 2;
-
     if (
         self.buf.bytes[*idx] == '\r' &&
         self.buf.bytes[*idx + 1] == '\n' &&
@@ -121,7 +147,7 @@ fn ParserState? Parser.step_headers(&self, usz* idx)
         String line = (String) self.buf.bytes[self.buf.read_idx..*idx];
         self.response.parse_header_line(line)!;
 
-        *idx += clrf_offset;
+        *idx += CRLF_OFFSET;
         self.buf.read_idx = *idx;
 
         if (*idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
@@ -130,71 +156,5 @@ fn ParserState? Parser.step_headers(&self, usz* idx)
 
     return HEADER_PROGRESS;
 }
-fn ParserState? Parser.step(&self, char[] input)
-{
-    if (input.len == 0) return EOF;
 
-    self.buf.write(input)!!;
-
-    // TODO: Exract to a const file.
-    usz clrf_offset = 2;
-
-    usz idx = self.buf.read_idx;
-    while (idx < self.buf.write_idx)
-    {
-    switch(self.state)
-    {
-        case STATUS_LINE:
-            ParserState status_line_step = self.step_status_line(&idx)!;
-
-            if (status_line_step == REQUEST_MORE) return status_line_step;
-            if (status_line_step == HEADER) break;
-
-            idx++;
-
-        case HEADER:
-            ParserState header_step = self.step_headers(&idx)!;
-
-            if (header_step == HEADER_READ) continue;
-            if (header_step == HEADER_PROGRESS) idx++;
-            if (header_step == REQUEST_MORE) return header_step;
-            if (header_step == BODY)
-            {
-                self.response.parse_body_type();
-                break;
-            }
-
-        case BODY:
-            //self.state = COMPLETE;
-            return self.state;
-
-        default:
-            return self.state;
-    }
-    }
-
-    if (self.state != COMPLETE) return REQUEST_MORE;
-
-    return self.state;
-}
-
-
-fn bool Parser.contains_crlf(&self, char[] input) @private
-{
-    String x = (String) input;
-    return x.contains(CRLF);
-}
-
-fn usz? Parser.find_end_of_crlf(&self, char[] input) @private
-{
-    String x = (String) input;
-    return x.index_of(CRLF)! + 4;
-}
-
-fn String Parser.buf_str_view(&self)
-{
-    //usz end_idx = self.buf.write_idx - self.buf.read_idx;
-    //tora::debug("end idx: %d", end_idx);
-    //return (String) self.buf.bytes[0:end_idx];
-    return (String) self.buf.bytes;
-}
+fn String Parser.buf_str_view(&self) => (String) self.buf.bytes;
