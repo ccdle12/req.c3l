@@ -121,6 +121,7 @@ fn void test_headers_without_double_crlf() @test
     test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
 }
 
+
 // TODO: This should be detected some how? the length of the long header
 // with multiple headers could be considered value.
 //fn void test_missing_crlf() @test
@@ -146,7 +147,7 @@ fn void test_headers_without_double_crlf() @test
 // valid but the body length is assumed to be 0.
 fn void test_no_body_type() @test
 {
-    String input =
+   String input =
         "HTTP/1.1 200 OK \r\n"
         "Content-Type: application/json \r\n"
         "Connection: keep-alive \r\n"
@@ -207,4 +208,67 @@ fn void test_chunked_body_type() @test
 
     ParserState state = parser.step(input)!!;
     test::eq(parser.response.body_type, BodyType.CHUNKED);
+}
+
+fn void test_missing_trailing_crlf() @test
+{
+    String input =
+        "HTTP/1.1 200 OK";
+
+    Parser parser;
+    parser.tinit();
+
+    assert(parser.step(input)!! == ParserState.REQUEST_MORE);
+}
+
+fn void test_missing_trailing_lf() @test
+{
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type: application/json \r";
+
+    Parser parser;
+    parser.tinit();
+
+    assert(parser.step(input)!! == REQUEST_MORE);
+}
+
+fn void test_lone_lf() @test
+{
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type: application/json \n";
+
+    Parser parser;
+    parser.tinit();
+
+    assert(@catch(parser.step(input)) == MALFORMED_CRLF);
+}
+
+fn void test_malformed_crlf_0() @test
+{
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type: application/json \r\n"
+        "Content-Length: 115 \r\n"
+        "Connection: keep-alive \r\n"
+        "Date: Wed, 13 Aug 2025 12:00:00 GMT \r"
+        "Server: nginx/1.18.0";
+
+    Parser parser;
+    parser.tinit();
+
+    test::eq(@catch(parser.step(input)), MALFORMED_CRLF);
+}
+
+fn void test_malformed_crlf_1() @test
+{
+    String input =
+        "HTTP/1.1 200 OK \r\n"
+        "Content-Type: application/json \rfoo\n";
+
+    Parser parser;
+    parser.tinit();
+
+    assert(@catch(parser.step(input)) == MALFORMED_CRLF);
 }
