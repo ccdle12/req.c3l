@@ -1,7 +1,6 @@
 module req;
 
 import std::collections::map;
-import tora;
 
 <*
  Helper test function to feed invalid header lines.
@@ -26,6 +25,7 @@ fn void test_invalid_header_key_symbols() @test
         "Connec]ion: keep-alive",   // Invalid character ']'
         "Connection{: keep-alive",   // Invalid character '{'
         "Connection}: keep-alive"   // Invalid character '}'
+        "Connection -Type: keep-alive"   // Invalid character ' '
     };
 
     foreach (&header : invalid_headers) test_invalid_header(*header, INVALID_HEADER_KEY_SYMBOL);
