@@ -1,8 +1,5 @@
 module req;
 
-import tora;
-import std::io;
-
 fn void test_incomplete_header() @test
 {
     String input =
