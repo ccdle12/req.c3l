@@ -131,6 +131,9 @@ fn ParserState? Parser.step_headers(&self, usz* idx)
         self.buf.bytes[*idx - 1] == '\n'
     )
     {
+        *idx += CRLF_OFFSET;
+        self.buf.read_idx = *idx;
+
         self.state = BODY;
         return self.state;
     }
