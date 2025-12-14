@@ -1,7 +1,5 @@
 module req;
 
-import std::collections::map;
-
 <*
  Helper test function to feed invalid header lines.
 *>
