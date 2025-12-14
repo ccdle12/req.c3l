@@ -18,6 +18,10 @@ enum ParserState
     COMPLETE,
     REQUEST_MORE,
     EOF,
+
+    //---- BODY STATES, MAYBE MOVE TO OWN PARSER ----
+    READ_HEX_NUM,
+    READ_CHUNK,
 }
 
 struct Parser
@@ -26,7 +30,27 @@ struct Parser
     ParserState state;
     io::ByteBuffer buf;
     Response response;
+
+
+    // --- Probably needs its own body parser for these variables to be encapsulated.
+    ulong chunk_size_read;
+    ParserState body_state;
 }
+
+enum BodyParserState
+{
+    READ_HEX_NUM,
+    READ_CHUNK,
+}
+
+struct BodyParser
+{
+    ulong chunk_size_read;
+    ParserState body_state;
+}
+
+fn void BodyParser.init(&self)
+{}
 
 fn void Parser.init(&self, Allocator allocator)
 {
@@ -75,8 +99,15 @@ fn ParserState? Parser.step(&self, char[] input)
                 }
 
             case BODY:
-                //self.state = COMPLETE;
-                return self.state;
+                // ---- MAYBE MOVE TO BODY PARSER?
+                if (self.response.body_type == CHUNKED)
+                {
+                    self.body_state = READ_HEX_NUM;
+                    ParserState body_step = self.step_body(&idx)!;
+                    if (body_step == REQUEST_MORE) return body_step;
+                }
+
+                idx++;
 
             default:
                 return self.state;
@@ -166,6 +197,33 @@ fn ParserState? Parser.step_headers(&self, usz* idx)
     }
 
     return HEADER_PROGRESS;
+}
+
+
+fn ParserState? Parser.step_body(&self, usz* idx)
+{
+    // TODO:
+    // 1. Maybe check state? - READ_HEX_NUM, READ_CHUNK
+    if (self.body_state == READ_HEX_NUM)
+    {
+        // We have the end of the line.
+        if (self.buf.bytes[*idx] == '\r' && self.buf.bytes[*idx + 1] == '\n')
+        {
+            io::printfn("found crlf");
+            // TODO: Need to test for -1 if at 0 or something.
+            String line = (String) self.buf.bytes[self.buf.read_idx..*idx-1];
+            ulong chunk_size = line.to_uint(base: 16)!;
+
+            // TODO: Set the hex number?
+            self.chunk_size_read = chunk_size;
+
+            self.body_state = READ_CHUNK;
+        }
+    }
+
+    //if (*idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
+
+    return BODY;
 }
 
 fn String Parser.buf_str_view(&self) => (String) self.buf.bytes;

@@ -36,13 +36,14 @@ struct Response
     LinkedHashMap{String, String} headers;
 
     BodyType body_type;
-    String body;
+    DString body;
 }
 
 fn void Response.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.headers.init(self.allocator);
+    self.body.init(self.allocator);
 }
 
 fn void Response.tinit(&self) => self.init(tmem);
@@ -50,6 +51,7 @@ fn void Response.tinit(&self) => self.init(tmem);
 fn void Response.free(&self)
 {
     self.headers.free();
+    self.body.free();
 }
 
 fn void? Response.parse_status_line(&self, String header_status_line)

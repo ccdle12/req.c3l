@@ -33,10 +33,10 @@ fn void test_with_allocator() @test
     parser.init(&alloc);
     defer parser.free();
 
-    ParserState state = parser.step(input)!!;
+    ParserState result = parser.step(input)!!;
 
-    // We should have moved to the header state but we need more bytes.
-    test::eq(state, ParserState.BODY);
+    test::eq(result, ParserState.REQUEST_MORE);
+    test::eq(parser.state, ParserState.BODY);
 }
 
 fn void test_full_header() @test
@@ -54,7 +54,7 @@ fn void test_full_header() @test
     Parser parser;
     parser.tinit();
 
-    test::eq(parser.step(input)!!, ParserState.BODY);
+    test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
     test::eq(parser.state, ParserState.BODY);
     test::@check(parser.buf_str_view().contains(input));
 
@@ -97,7 +97,7 @@ fn void test_incremental_read() @test
     String input_3 =
       "\r\n\r\n";
 
-    test::eq(parser.step(input_3)!!, ParserState.BODY);
+    test::eq(parser.step(input_3)!!, ParserState.REQUEST_MORE);
     test::eq(parser.state, ParserState.BODY);
     test::@check(parser.buf_str_view().contains(input_3));
 }
@@ -177,9 +177,7 @@ fn void test_transfer_encoding_priority() @test
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n"
         "Server: nginx/1.18.0 \r\n"
         "transfer-encoding: chunked \r\n"
-        "\r\n"
-        "{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}"
-        "0\r\n\r\n";
+        "\r\n";
 
     Parser parser;
     parser.tinit();
