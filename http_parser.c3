@@ -37,6 +37,7 @@ struct Parser
     Allocator allocator;
     ParserState state;
     io::ByteBuffer buf;
+    ParserMode mode;
     Response response;
     BodyParser body_parser;
 
@@ -62,6 +63,13 @@ enum BodyParserState
     DOUBLE_LF,
     EOF,
     COMPLETE,
+}
+
+enum ParserMode
+{
+    STATUS_LINE,
+    HEADER,
+    BODY,
 }
 
 struct BodyParser
@@ -91,6 +99,7 @@ fn void Parser.init(&self, Allocator allocator)
     self.state = STATUS_LINE_PROTOCOL;
     self.response.init(self.allocator);
     self.body_parser.init(self.allocator);
+    self.mode = STATUS_LINE;
 
     // TODO: I'll need to free this.
     self.status_protocol_cache.init(self.allocator);
@@ -111,36 +120,31 @@ fn void Parser.free(&self)
    self.status_line_reason.free();
 }
 
-//fn ParserState? ParserState.step_status_line_new(&self)
-//{
-    // TODO:
-    // STATES:
-    // 1. STATUS_PARSE_PROTOCOL
-        // read until first white space
-        // Declare the first idx
-        // Increment read_idx
-        // Pass (line) to response to validate
-    // 2. Move to WHITESPACE
-        // validate whitespace
-        // increment idx
-        // Move to STATUS_CODE
-    // 3. STATUS_CODE
-        // Read until whitespace or '\r'
-        // Declare the first idx
-        // Increment read_idx
-        // Pass (line) to response to validate status_code
-        // If whitespace, move to OPTIONAL_REASON
-        // If no whitespace, move to STATUS_LINE_CR
-//}
-
-
 fn ParserState? Parser.step(&self, char[] input)
 {
     if (input.len == 0) return EOF;
     self.buf.write(input)!!;
 
-    usz* read_idx = &self.buf.read_idx;
+    while (self.buf.read_idx < self.buf.write_idx)
+    {
+        switch (self.mode)
+        {
+            case STATUS_LINE:
+                if (self.step_status_line()! == HEADER) self.mode = HEADER;
+                break;
+            case HEADER:
+                break;
+            case BODY:
+                break;
+        }
+    }
 
+    return REQUEST_MORE;
+}
+
+fn ParserState? Parser.step_status_line(&self)
+{
+    usz* read_idx = &self.buf.read_idx;
     while (self.buf.read_idx < self.buf.write_idx)
     {
         switch(self.state)
@@ -166,7 +170,10 @@ fn ParserState? Parser.step(&self, char[] input)
                 }
                 else
                 {
-                    self.response.parse_status_code(self.status_code_cache.str_view())!;
+                    if (@catch(self.response.parse_status_code(self.status_code_cache.str_view())))
+                    {
+                        return INVALID_STATUS_CODE?;
+                    }
 
                     if (self.buf.bytes[*read_idx] == '\r') self.state = STATUS_LINE_CR;
                     if (self.buf.bytes[*read_idx] == ' ') self.state = STATUS_LINE_REASON_SPACE;
@@ -184,9 +191,10 @@ fn ParserState? Parser.step(&self, char[] input)
 
             case STATUS_LINE_CF:
                 if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
+                io::printfn("in status_line_cf");
                 self.state = HEADER;
                 (*read_idx)++;
-                break;
+                return self.state;
 
             case STATUS_LINE_REASON_SPACE:
                 if (self.buf.bytes[*read_idx] != ' ') return MALFORMED_STATUS_LINE?;
@@ -216,7 +224,9 @@ fn ParserState? Parser.step(&self, char[] input)
     }
 
     return REQUEST_MORE;
+
 }
+
 
 // TODO:
 // 1. Turn each state into
@@ -226,13 +236,14 @@ fn ParserState? Parser.step_old(&self, char[] input)
 
     self.buf.write(input)!!;
 
+
     usz idx = self.buf.read_idx;
     while (idx < self.buf.write_idx)
     {
         switch(self.state)
         {
             case STATUS_LINE:
-                ParserState result = self.step_status_line(idx)!;
+                ParserState result = self.step_status_line_old(idx)!;
 
                 if (result == REQUEST_MORE) return result;
                 if (result == HEADER)
@@ -281,7 +292,7 @@ fn ParserState? Parser.step_old(&self, char[] input)
 }
 
 
-fn ParserState? Parser.step_status_line(&self, usz idx)
+fn ParserState? Parser.step_status_line_old(&self, usz idx)
 {
     // Check for a malformed CLRF. This is for a lone LF.
     if (self.buf.bytes[idx] == '\n')
