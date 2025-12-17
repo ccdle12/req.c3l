@@ -229,9 +229,6 @@ struct BodyParserResult
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
 fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
 {
-    io::printfn("beginning idx: %d", *idx);
-    io::printfn("end idx: %d", (*end));
-
     while (*idx < *end)
     {
     switch(self.body_parser.state)
