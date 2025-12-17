@@ -43,7 +43,7 @@ fn void Response.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.headers.init(self.allocator);
-    self.body.init(self.allocator);
+    self.body.init(self.allocator, MAX_SIZE);
 }
 
 fn void Response.tinit(&self) => self.init(tmem);
