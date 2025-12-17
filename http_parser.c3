@@ -22,6 +22,14 @@ enum ParserState
 
     // --- tmp
     BODY_READ,
+    STATUS_LINE_PROTOCOL,
+    WHITESPACE,
+    STATUS_LINE_STATUS_CODE,
+    STATUS_LINE_CR,
+    STATUS_LINE_CF,
+    STATUS_LINE_REASON_SPACE,
+    STATUS_LINE_REASON,
+
 }
 
 struct Parser
@@ -31,6 +39,11 @@ struct Parser
     io::ByteBuffer buf;
     Response response;
     BodyParser body_parser;
+
+    // Maybe move to status parser?
+    DString status_protocol_cache;
+    DString status_code_cache;
+    DString status_line_reason;
 }
 
 enum BodyParserState
@@ -75,8 +88,14 @@ fn void Parser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.buf.init(self.allocator, MAX_SIZE, INITIAL_CAPACITY);
+    self.state = STATUS_LINE_PROTOCOL;
     self.response.init(self.allocator);
     self.body_parser.init(self.allocator);
+
+    // TODO: I'll need to free this.
+    self.status_protocol_cache.init(self.allocator);
+    self.status_code_cache.init(self.allocator);
+    self.status_line_reason.init(self.allocator);
 }
 
 fn void Parser.tinit(&self) => self.init(tmem);
@@ -86,9 +105,122 @@ fn void Parser.free(&self)
    self.buf.free();
    self.response.free();
    self.body_parser.free();
+
+   self.status_protocol_cache.free();
+   self.status_code_cache.free();
+   self.status_line_reason.free();
 }
 
+//fn ParserState? ParserState.step_status_line_new(&self)
+//{
+    // TODO:
+    // STATES:
+    // 1. STATUS_PARSE_PROTOCOL
+        // read until first white space
+        // Declare the first idx
+        // Increment read_idx
+        // Pass (line) to response to validate
+    // 2. Move to WHITESPACE
+        // validate whitespace
+        // increment idx
+        // Move to STATUS_CODE
+    // 3. STATUS_CODE
+        // Read until whitespace or '\r'
+        // Declare the first idx
+        // Increment read_idx
+        // Pass (line) to response to validate status_code
+        // If whitespace, move to OPTIONAL_REASON
+        // If no whitespace, move to STATUS_LINE_CR
+//}
+
+
 fn ParserState? Parser.step(&self, char[] input)
+{
+    if (input.len == 0) return EOF;
+    self.buf.write(input)!!;
+
+    usz* read_idx = &self.buf.read_idx;
+
+    while (self.buf.read_idx < self.buf.write_idx)
+    {
+        switch(self.state)
+        {
+            case STATUS_LINE_PROTOCOL:
+                if (self.buf.bytes[*read_idx] != ' ')
+                {
+                    self.status_protocol_cache.append_char(self.buf.bytes[*read_idx]);
+                }
+                else
+                {
+                    self.response.parse_http_protocol(self.status_protocol_cache.str_view())!;
+                    self.state = STATUS_LINE_STATUS_CODE;
+                }
+
+                (*read_idx)++;
+                break;
+
+            case STATUS_LINE_STATUS_CODE:
+                if (self.buf.bytes[*read_idx] != '\r' && self.buf.bytes[*read_idx] != ' ')
+                {
+                    self.status_code_cache.append_char(self.buf.bytes[*read_idx]);
+                }
+                else
+                {
+                    self.response.parse_status_code(self.status_code_cache.str_view())!;
+
+                    if (self.buf.bytes[*read_idx] == '\r') self.state = STATUS_LINE_CR;
+                    if (self.buf.bytes[*read_idx] == ' ') self.state = STATUS_LINE_REASON_SPACE;
+                    break;
+                }
+
+                (*read_idx)++;
+                break;
+
+            case STATUS_LINE_CR:
+                if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
+                self.state = STATUS_LINE_CF;
+                (*read_idx)++;
+                break;
+
+            case STATUS_LINE_CF:
+                if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
+                self.state = HEADER;
+                (*read_idx)++;
+                break;
+
+            case STATUS_LINE_REASON_SPACE:
+                if (self.buf.bytes[*read_idx] != ' ') return MALFORMED_STATUS_LINE?;
+                self.state = STATUS_LINE_REASON;
+                (*read_idx)++;
+                break;
+
+            case STATUS_LINE_REASON:
+                if (self.buf.bytes[*read_idx] != '\r' && self.buf.bytes[*read_idx] != ' ')
+                {
+                    self.status_line_reason.append_char(self.buf.bytes[*read_idx]);
+                }
+                else
+                {
+                    // TODO: Need to set a max length of this reason phrase?
+                    self.response.reason_phrase = self.status_line_reason.str_view();
+                    self.state = STATUS_LINE_CR;
+                    break;
+                }
+
+                (*read_idx)++;
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    return REQUEST_MORE;
+}
+
+// TODO:
+// 1. Turn each state into
+fn ParserState? Parser.step_old(&self, char[] input)
 {
     if (input.len == 0) return EOF;
 
@@ -147,6 +279,7 @@ fn ParserState? Parser.step(&self, char[] input)
 
     return self.state;
 }
+
 
 fn ParserState? Parser.step_status_line(&self, usz idx)
 {
