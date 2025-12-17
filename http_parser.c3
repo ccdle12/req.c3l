@@ -56,19 +56,19 @@ struct BodyParser
     Allocator allocator;
     BodyParserState state;
     ulong chunk_size_read;
-    DString chunk_size_hex;
+    DString chunk_size_cache;
 }
 
 fn void BodyParser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.state = READ_HEX_NUM;
-    self.chunk_size_hex.init(self.allocator);
+    self.chunk_size_cache.init(self.allocator);
 }
 
 fn void BodyParser.free(&self)
 {
-    self.chunk_size_hex.free();
+    self.chunk_size_cache.free();
 }
 
 fn void Parser.init(&self, Allocator allocator)
@@ -240,23 +240,23 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
             if (self.buf.bytes[*idx] != '\r')
             {
                 io::printfn("Adding to chunk size hex");
-                self.body_parser.chunk_size_hex.append_char(self.buf.bytes[*idx]);
+                self.body_parser.chunk_size_cache.append_char(self.buf.bytes[*idx]);
                 (*idx)++;
+                break;
+            }
+
+            ulong chunk_size = self.body_parser.chunk_size_cache.str_view().to_uint(base: 16)!;
+            self.body_parser.chunk_size_read = chunk_size;
+            self.body_parser.chunk_size_cache.clear();
+
+            if (self.body_parser.chunk_size_read == 0)
+            {
+                self.body_parser.state = ZERO_HEX_CR;
             }
             else
             {
-                ulong chunk_size = self.body_parser.chunk_size_hex.str_view().to_uint(base: 16)!;
-                self.body_parser.chunk_size_read = chunk_size;
-                self.body_parser.chunk_size_hex.clear();
-
                 self.body_parser.state = AFTER_HEX_CR;
-
-                if (self.body_parser.chunk_size_read == 0)
-                {
-                    self.body_parser.state = ZERO_HEX_CR;
-                }
             }
-
 
             break;
 
@@ -264,7 +264,6 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
             self.body_parser.state = AFTER_HEX_LF;
             (*idx)++;
             break;
-
 
         case AFTER_HEX_LF:
             if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
@@ -276,9 +275,7 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
             if (self.body_parser.chunk_size_read > 0)
             {
                 body.append_char(self.buf.bytes[*idx]);
-                io::printfn("in read chunk, pushing char: %c", self.buf.bytes[*idx]);
                 self.body_parser.chunk_size_read--;
-                io::printfn("in read chunk: body: %s", body.str_view());
                 (*idx)++;
             }
             else
@@ -290,32 +287,26 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
 
         case AFTER_CHUNK_CR:
             if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
-            (*idx)++;
             self.body_parser.state = AFTER_CHUNK_LF;
+            (*idx)++;
             break;
 
         case AFTER_CHUNK_LF:
             if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
-            (*idx)++;
             self.body_parser.state = READ_HEX_NUM;
+            (*idx)++;
             break;
 
         case ZERO_HEX_CR:
             if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
-
-            if (self.buf.bytes[*idx] == '\r')
-            {
-                io::printfn("current byte in zero hex cr IS 'cr'");
-            }
-
-            (*idx)++;
             self.body_parser.state = ZERO_HEX_LF;
+            (*idx)++;
             break;
 
         case ZERO_HEX_LF:
             if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
-            (*idx)++;
             self.body_parser.state = EXTENSION;
+            (*idx)++;
             break;
 
         case EXTENSION:
@@ -324,7 +315,6 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
 
         case DOUBLE_CR:
             if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
-
             self.body_parser.state = DOUBLE_LF;
             (*idx)++;
             break;
