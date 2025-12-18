@@ -54,6 +54,25 @@ fn void Response.free(&self)
     self.body.free();
 }
 
+fn void? Response.parse_status_code(&self, String status_code)
+{
+    if (status_code.len > 3) return INVALID_STATUS_CODE?;
+    self.status_code = status_code.to_integer(int, 10)!;
+    return;
+}
+
+fn void? Response.parse_http_protocol(&self, String protocol)
+{
+    if (protocol != HTTP11 && protocol != HTTP10)
+    {
+        return INVALID_PROTOCOL_VERSION?;
+    }
+
+    self.http_version = protocol;
+
+    return;
+}
+
 fn void? Response.parse_status_line(&self, String header_status_line)
 {
     String[] status_line = header_status_line.split(self.allocator, " ", 3);

@@ -142,6 +142,7 @@ fn ParserState? Parser.step(&self, char[] input)
     return REQUEST_MORE;
 }
 
+// TODO: Maybe make these StatusLineStates?
 fn ParserState? Parser.step_status_line(&self)
 {
     usz* read_idx = &self.buf.read_idx;
@@ -150,6 +151,7 @@ fn ParserState? Parser.step_status_line(&self)
         switch(self.state)
         {
             case STATUS_LINE_PROTOCOL:
+                // @step_until(target, innercode to execute)
                 if (self.buf.bytes[*read_idx] != ' ')
                 {
                     self.status_protocol_cache.append_char(self.buf.bytes[*read_idx]);
@@ -225,6 +227,87 @@ fn ParserState? Parser.step_status_line(&self)
 
     return REQUEST_MORE;
 
+}
+
+fn ParserState? Parser.step_header(&self)
+{
+    usz* read_idx = &self.buf.read_idx;
+    while (self.buf.read_idx < self.buf.write_idx)
+    {
+
+        // Case HEADER_KEY:
+        // loop until ':'
+        //      if ('\r') go to case DOUBLE_CR
+        //      if not ':' then append_header_key(c), validate each c for tchar
+        //      increment idx
+        //      go to casse HEADER VALUE
+        // case HEADER_VALUE:
+        //      if not '\r', append_header_value(c), trim header_value,
+        //      append key and header
+        //      increment idx
+        //      go to CR
+        // case CR
+        //      validate cr
+        //      increment idx
+        //      go to LF
+        // case LF
+        //      validate LF
+        //      increment idx
+        //      go to HEADER_KEY
+        //
+        // case DOUBLE_CR:
+        //      validate cr
+        //      increment idx
+        //      go to DOUBLE_LF
+        //
+        // case DOUBLE_LF:
+        //      validate lf
+        //      increment idx
+        //      return BODY
+        //
+
+    }
+}
+
+fn ParserState? Parser.step_headers(&self, usz idx)
+{
+    if (
+        self.buf.bytes[idx] == '\r' &&
+        self.buf.bytes[idx + 1] == '\n' &&
+        self.buf.bytes[idx - 2] == '\r' &&
+        self.buf.bytes[idx - 1] == '\n'
+    )
+    {
+        self.state = BODY;
+        return self.state;
+    }
+
+    if (idx >= (self.buf.write_idx - 1))
+    {
+        // We have a malformed CRLF, we have the LF without a previous CR which
+        // would indicate a double crlf.
+        if (self.buf.bytes[idx] == '\n' && self.buf.bytes[idx - 1] != '\r')
+        {
+            return MALFORMED_CRLF?;
+        }
+
+        return REQUEST_MORE;
+    }
+
+    if (self.buf.bytes[idx] == '\r')
+    {
+        if (self.buf.bytes[idx + 1] != '\n') return MALFORMED_CRLF?;
+
+        // We found the clrf, read the single header.
+        String line = (String) self.buf.bytes[self.buf.read_idx..idx];
+        self.response.parse_header_line(line)!;
+
+        if (idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
+
+        return HEADER_READ;
+    }
+
+    return HEADER_PROGRESS;
 }
 
 
@@ -323,46 +406,7 @@ fn ParserState? Parser.step_status_line_old(&self, usz idx)
     return self.state;
 
 }
-fn ParserState? Parser.step_headers(&self, usz idx)
-{
-    if (
-        self.buf.bytes[idx] == '\r' &&
-        self.buf.bytes[idx + 1] == '\n' &&
-        self.buf.bytes[idx - 2] == '\r' &&
-        self.buf.bytes[idx - 1] == '\n'
-    )
-    {
-        self.state = BODY;
-        return self.state;
-    }
 
-    if (idx >= (self.buf.write_idx - 1))
-    {
-        // We have a malformed CRLF, we have the LF without a previous CR which
-        // would indicate a double crlf.
-        if (self.buf.bytes[idx] == '\n' && self.buf.bytes[idx - 1] != '\r')
-        {
-            return MALFORMED_CRLF?;
-        }
-
-        return REQUEST_MORE;
-    }
-
-    if (self.buf.bytes[idx] == '\r')
-    {
-        if (self.buf.bytes[idx + 1] != '\n') return MALFORMED_CRLF?;
-
-        // We found the clrf, read the single header.
-        String line = (String) self.buf.bytes[self.buf.read_idx..idx];
-        self.response.parse_header_line(line)!;
-
-        if (idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
-
-        return HEADER_READ;
-    }
-
-    return HEADER_PROGRESS;
-}
 
 struct BodyParserResult
 {
