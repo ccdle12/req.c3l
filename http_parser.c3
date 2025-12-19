@@ -161,22 +161,25 @@ fn ParserState? Parser.step(&self, char[] input)
                 break;
             case HEADER:
                 ParserState result = self.step_headers()!;
+                io::printfn("in header result: %s", result);
                 if (result == BODY)
                 {
+                    if (self.response.body_type == NULL)
+                    {
+                        self.mode = COMPLETE;
+                        return COMPLETE;
+                    }
+
                     self.mode = BODY;
                     break;
-                }
-
-                if (self.response.body_type == NULL)
-                {
-                    self.mode = COMPLETE;
-                    return COMPLETE;
                 }
 
                 if (result == REQUEST_MORE) return REQUEST_MORE;
 
                 break;
             case BODY:
+                // TODO: This is only a chunk body stepper.
+                BodyParserState result = self.step_body(&self.buf.read_idx, &self.buf.write_idx, self.response.body)!;
                 break;
             case COMPLETE:
                 return COMPLETE;
@@ -298,6 +301,14 @@ fn ParserState? Parser.step_headers(&self)
             break;
 
         case HEADER_VALUE:
+            // Catching if we hav a LF out of place, passes to the CR handler
+            // to return the error.
+            if (self.buf.bytes[*read_idx] == '\n')
+            {
+                self.state = AFTER_HEADER_CR;
+                break;
+            }
+
             if (self.buf.bytes[*read_idx] != '\r')
             {
                 self.tmp_header_val.append_char(self.buf.bytes[*read_idx]);
@@ -310,6 +321,10 @@ fn ParserState? Parser.step_headers(&self)
 
             self.tmp_header.clear();
             self.tmp_header_val.clear();
+
+            // Set body type as it the headers arrive, we will enforce RFC 9112
+            // 6.1 - Transfer Encoding has precendence over Content-Length.
+            self.response.set_body_type();
 
             self.state = AFTER_HEADER_CR;
 
@@ -337,7 +352,7 @@ fn ParserState? Parser.step_headers(&self)
             if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
             (*read_idx)++;
             self.state = HEADER_COMPLETE;
-            break;
+            return BODY;
 
         default:
             break;
