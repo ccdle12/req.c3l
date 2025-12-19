@@ -30,6 +30,15 @@ enum ParserState
     STATUS_LINE_REASON_SPACE,
     STATUS_LINE_REASON,
 
+    // header states
+    HEADER_KEY,
+    HEADER_VALUE,
+    AFTER_HEADER_CR,
+    AFTER_HEADER_LF,
+    HEADER_COMPLETE,
+    DOUBLE_CR,
+    DOUBLE_LF,
+
 }
 
 struct Parser
@@ -45,6 +54,11 @@ struct Parser
     DString status_protocol_cache;
     DString status_code_cache;
     DString status_line_reason;
+
+
+    // Maybe move to a header parser
+    DString tmp_header;
+    DString tmp_header_val;
 }
 
 enum BodyParserState
@@ -70,6 +84,7 @@ enum ParserMode
     STATUS_LINE,
     HEADER,
     BODY,
+    COMPLETE,
 }
 
 struct BodyParser
@@ -105,6 +120,10 @@ fn void Parser.init(&self, Allocator allocator)
     self.status_protocol_cache.init(self.allocator);
     self.status_code_cache.init(self.allocator);
     self.status_line_reason.init(self.allocator);
+
+    // move to header parser
+    self.tmp_header.init(self.allocator);
+    self.tmp_header_val.init(self.allocator);
 }
 
 fn void Parser.tinit(&self) => self.init(tmem);
@@ -118,6 +137,8 @@ fn void Parser.free(&self)
    self.status_protocol_cache.free();
    self.status_code_cache.free();
    self.status_line_reason.free();
+   self.tmp_header.free();
+   self.tmp_header_val.free();
 }
 
 fn ParserState? Parser.step(&self, char[] input)
@@ -130,12 +151,35 @@ fn ParserState? Parser.step(&self, char[] input)
         switch (self.mode)
         {
             case STATUS_LINE:
-                if (self.step_status_line()! == HEADER) self.mode = HEADER;
+                if (self.step_status_line()! == HEADER)
+                {
+                    self.mode = HEADER;
+                    self.state = HEADER_KEY;
+                }
+                // TODO: THe same request mroe return?
+
                 break;
             case HEADER:
+                ParserState result = self.step_headers()!;
+                if (result == BODY)
+                {
+                    self.mode = BODY;
+                    break;
+                }
+
+                if (self.response.body_type == NULL)
+                {
+                    self.mode = COMPLETE;
+                    return COMPLETE;
+                }
+
+                if (result == REQUEST_MORE) return REQUEST_MORE;
+
                 break;
             case BODY:
                 break;
+            case COMPLETE:
+                return COMPLETE;
         }
     }
 
@@ -193,7 +237,6 @@ fn ParserState? Parser.step_status_line(&self)
 
             case STATUS_LINE_CF:
                 if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
-                io::printfn("in status_line_cf");
                 self.state = HEADER;
                 (*read_idx)++;
                 return self.state;
@@ -226,50 +269,86 @@ fn ParserState? Parser.step_status_line(&self)
     }
 
     return REQUEST_MORE;
-
 }
 
-fn ParserState? Parser.step_header(&self)
+fn ParserState? Parser.step_headers(&self)
 {
     usz* read_idx = &self.buf.read_idx;
     while (self.buf.read_idx < self.buf.write_idx)
     {
+        switch(self.state)
+        {
+        case HEADER_KEY:
+            if (self.buf.bytes[*read_idx] == '\r')
+            {
+                self.state = DOUBLE_CR;
+                break;
+            }
 
-        // Case HEADER_KEY:
-        // loop until ':'
-        //      if ('\r') go to case DOUBLE_CR
-        //      if not ':' then append_header_key(c), validate each c for tchar
-        //      increment idx
-        //      go to casse HEADER VALUE
-        // case HEADER_VALUE:
-        //      if not '\r', append_header_value(c), trim header_value,
-        //      append key and header
-        //      increment idx
-        //      go to CR
-        // case CR
-        //      validate cr
-        //      increment idx
-        //      go to LF
-        // case LF
-        //      validate LF
-        //      increment idx
-        //      go to HEADER_KEY
-        //
-        // case DOUBLE_CR:
-        //      validate cr
-        //      increment idx
-        //      go to DOUBLE_LF
-        //
-        // case DOUBLE_LF:
-        //      validate lf
-        //      increment idx
-        //      return BODY
-        //
+            // TODO: Need to return error if whitespace before ':'
+            if (self.buf.bytes[*read_idx] == ':')
+            {
+                self.state = HEADER_VALUE;
+                (*read_idx)++;
+                break;
+            }
 
+            self.tmp_header.append_char(self.buf.bytes[*read_idx]);
+            (*read_idx)++;
+            break;
+
+        case HEADER_VALUE:
+            if (self.buf.bytes[*read_idx] != '\r')
+            {
+                self.tmp_header_val.append_char(self.buf.bytes[*read_idx]);
+                (*read_idx)++;
+                break;
+            }
+
+            // TODO: Need to check if this memory frees correctly?
+            self.response.parse_and_set_kv(self.tmp_header, self.tmp_header_val)!;
+
+            self.tmp_header.clear();
+            self.tmp_header_val.clear();
+
+            self.state = AFTER_HEADER_CR;
+
+            break;
+
+        case AFTER_HEADER_CR:
+            if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
+            (*read_idx)++;
+            self.state = AFTER_HEADER_LF;
+            break;
+
+        case AFTER_HEADER_LF:
+            if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
+            (*read_idx)++;
+            self.state = HEADER_KEY;
+            break;
+
+        case DOUBLE_CR:
+            if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
+            (*read_idx)++;
+            self.state = DOUBLE_LF;
+            break;
+
+        case DOUBLE_LF:
+            if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
+            (*read_idx)++;
+            self.state = HEADER_COMPLETE;
+            break;
+
+        default:
+            break;
+        }
     }
+
+    io::printfn("returning request more?");
+    return REQUEST_MORE;
 }
 
-fn ParserState? Parser.step_headers(&self, usz idx)
+fn ParserState? Parser.step_headers_old(&self, usz idx)
 {
     if (
         self.buf.bytes[idx] == '\r' &&
@@ -339,7 +418,7 @@ fn ParserState? Parser.step_old(&self, char[] input)
                 idx++;
 
             case HEADER:
-                ParserState result = self.step_headers(idx)!;
+                ParserState result = self.step_headers_old(idx)!;
 
                 if (result == HEADER_READ)
                 {
