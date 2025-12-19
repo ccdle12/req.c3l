@@ -13,7 +13,7 @@ fn void test_basic_status_line() @test
 
    test::eq(parser.response.http_version, "HTTP/1.1");
    test::eq(parser.response.status_code, 200);
-   test::eq(parser.state, ParserState.HEADER);
+   test::eq(parser.state, ParserState.HEADER_KEY);
 }
 
 fn void test_status_line_with_reason() @test
@@ -28,7 +28,7 @@ fn void test_status_line_with_reason() @test
    test::eq(parser.response.http_version, "HTTP/1.1");
    test::eq(parser.response.status_code, 200);
    test::eq(parser.response.reason_phrase, "OK");
-   test::eq(parser.state, ParserState.HEADER);
+   test::eq(parser.state, ParserState.HEADER_KEY);
 }
 
 fn void test_incorrect_http_version() @test

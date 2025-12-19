@@ -73,50 +73,35 @@ fn void? Response.parse_http_protocol(&self, String protocol)
     return;
 }
 
-fn void? Response.parse_status_line(&self, String header_status_line)
+fn void? Response.parse_header(&self, String key)
 {
-    String[] status_line = header_status_line.split(self.allocator, " ", 3);
-    defer allocator::free(self.allocator, status_line);
-
-    if (status_line.len <= 1) return MALFORMED_STATUS_LINE?;
-
-    if (status_line[0] != HTTP11 && status_line[0] != HTTP10)
-    {
-        return INVALID_PROTOCOL_VERSION?;
-    }
-    self.http_version = status_line[0];
-
-    if (status_line[1].len != 3) return INVALID_STATUS_CODE?;
-    foreach (c : status_line[1])
-    {
-        if (!ascii::@is_digit(c)) return INVALID_STATUS_CODE?;
-    }
-    self.status_code = status_line[1].to_integer(int, 10)!;
-
-    if (status_line.len > 2)
-    {
-        self.reason_phrase = status_line[2].trim();
-    }
-}
-
-fn void? Response.parse_header_line(&self, String header_line)
-{
-    String[] kv = header_line.split(self.allocator, ":", 2);
-    defer allocator::free(self.allocator, kv);
-
-    if (kv.len < 2) return MALFORMED_HEADER?;
-
-    String key = kv[0].to_lower_copy(self.allocator);
-    defer allocator::free(self.allocator, key);
-
     if (key[key.len - 1] == ' ') return INVALID_TRAILING_SPACE?;
 
     foreach(c : key)
     {
         if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL?;
     }
+}
 
-    self.headers.set(key, kv[1].trim());
+fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_value)
+{
+    String key = header_key.copy_str(self.allocator).to_lower_copy(self.allocator);
+
+    self.parse_header(key)!;
+    String value = header_value.copy_str(self.allocator).trim();
+
+    self.headers.set(key, value);
+}
+
+// TODO: This is naive setting for now, we need to be able to handle:
+// - compress
+// - deflate
+// - gzip
+fn void Response.set_body_type(&self)
+{
+    if (self.headers.has_key("content-length")) self.body_type = CONTENT_LENGTH;
+    if (self.headers.has_key("transfer-encoding")) self.body_type = CHUNKED;
+    return;
 }
 
 fn String*? Response.get_header_ref(&self, String key)

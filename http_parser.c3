@@ -161,7 +161,6 @@ fn ParserState? Parser.step(&self, char[] input)
                 break;
             case HEADER:
                 ParserState result = self.step_headers()!;
-                io::printfn("in header result: %s", result);
                 if (result == BODY)
                 {
                     if (self.response.body_type == NULL)
@@ -179,7 +178,7 @@ fn ParserState? Parser.step(&self, char[] input)
                 break;
             case BODY:
                 // TODO: This is only a chunk body stepper.
-                BodyParserState result = self.step_body(&self.buf.read_idx, &self.buf.write_idx, self.response.body)!;
+                BodyParserState result = self.step_body()!;
                 break;
             case COMPLETE:
                 return COMPLETE;
@@ -363,164 +362,20 @@ fn ParserState? Parser.step_headers(&self)
     return REQUEST_MORE;
 }
 
-fn ParserState? Parser.step_headers_old(&self, usz idx)
-{
-    if (
-        self.buf.bytes[idx] == '\r' &&
-        self.buf.bytes[idx + 1] == '\n' &&
-        self.buf.bytes[idx - 2] == '\r' &&
-        self.buf.bytes[idx - 1] == '\n'
-    )
-    {
-        self.state = BODY;
-        return self.state;
-    }
-
-    if (idx >= (self.buf.write_idx - 1))
-    {
-        // We have a malformed CRLF, we have the LF without a previous CR which
-        // would indicate a double crlf.
-        if (self.buf.bytes[idx] == '\n' && self.buf.bytes[idx - 1] != '\r')
-        {
-            return MALFORMED_CRLF?;
-        }
-
-        return REQUEST_MORE;
-    }
-
-    if (self.buf.bytes[idx] == '\r')
-    {
-        if (self.buf.bytes[idx + 1] != '\n') return MALFORMED_CRLF?;
-
-        // We found the clrf, read the single header.
-        String line = (String) self.buf.bytes[self.buf.read_idx..idx];
-        self.response.parse_header_line(line)!;
-
-        if (idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
-
-        return HEADER_READ;
-    }
-
-    return HEADER_PROGRESS;
-}
-
-
-// TODO:
-// 1. Turn each state into
-fn ParserState? Parser.step_old(&self, char[] input)
-{
-    if (input.len == 0) return EOF;
-
-    self.buf.write(input)!!;
-
-
-    usz idx = self.buf.read_idx;
-    while (idx < self.buf.write_idx)
-    {
-        switch(self.state)
-        {
-            case STATUS_LINE:
-                ParserState result = self.step_status_line_old(idx)!;
-
-                if (result == REQUEST_MORE) return result;
-                if (result == HEADER)
-                {
-                    idx += CRLF_OFFSET;
-                    self.buf.read_idx = idx;
-                    break;
-                }
-
-                idx++;
-
-            case HEADER:
-                ParserState result = self.step_headers_old(idx)!;
-
-                if (result == HEADER_READ)
-                {
-                    idx += CRLF_OFFSET;
-                    self.buf.read_idx = idx;
-
-                    continue;
-                }
-                if (result == HEADER_PROGRESS) idx++;
-                if (result == REQUEST_MORE) return result;
-                if (result == BODY)
-                {
-                    idx += CRLF_OFFSET;
-                    self.buf.read_idx = idx;
-
-                    self.response.parse_body_type();
-                    break;
-                }
-
-            case BODY:
-                BodyParserState body_result = self.step_body(&self.buf.read_idx, &self.buf.write_idx, self.response.body)!;
-                if (body_result == EOF) return REQUEST_MORE;
-                if (body_result == BodyParserState.COMPLETE) return COMPLETE;
-
-            default:
-                return self.state;
-        }
-    }
-
-    if (self.state != COMPLETE) return REQUEST_MORE;
-
-    return self.state;
-}
-
-
-fn ParserState? Parser.step_status_line_old(&self, usz idx)
-{
-    // Check for a malformed CLRF. This is for a lone LF.
-    if (self.buf.bytes[idx] == '\n')
-    {
-        if (idx == 0 || self.buf.bytes[idx - 1] != '\r')
-        {
-            return MALFORMED_CRLF?;
-        }
-    }
-
-    // We've reached EOF without finding the full CRLF - request more bytes.
-    if (idx >= (self.buf.write_idx - 1)) return REQUEST_MORE;
-
-    // We've identified the CR, parse the next byte for LF, we've already
-    // done the check above for EOF.
-    if (self.buf.bytes[idx] == '\r')
-    {
-        if (idx + 1 < self.buf.write_idx && self.buf.bytes[idx + 1] != '\n')
-        {
-            return MALFORMED_CRLF?;
-        }
-
-        String line = (String) self.buf.bytes[self.buf.read_idx..idx];
-        self.response.parse_status_line(line)!;
-        self.state = HEADER;
-    }
-
-    return self.state;
-
-}
-
-
-struct BodyParserResult
-{
-    BodyParserState state;
-    usz bytes_read;
-}
-
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
+fn BodyParserState? Parser.step_body(&self)
 {
-    while (*idx < *end)
+    usz* read_idx = &self.buf.read_idx;
+    while (self.buf.read_idx < self.buf.write_idx)
     {
     switch(self.body_parser.state)
     {
         case READ_HEX_NUM:
-            if (self.buf.bytes[*idx] != '\r')
+            if (self.buf.bytes[*read_idx] != '\r')
             {
                 io::printfn("Adding to chunk size hex");
-                self.body_parser.chunk_size_cache.append_char(self.buf.bytes[*idx]);
-                (*idx)++;
+                self.body_parser.chunk_size_cache.append_char(self.buf.bytes[*read_idx]);
+                (*read_idx)++;
                 break;
             }
 
@@ -541,21 +396,21 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
 
         case AFTER_HEX_CR:
             self.body_parser.state = AFTER_HEX_LF;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case AFTER_HEX_LF:
-            if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
             self.body_parser.state = READ_CHUNK;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case READ_CHUNK:
             if (self.body_parser.chunk_size_read > 0)
             {
-                body.append_char(self.buf.bytes[*idx]);
+                self.response.body.append_char(self.buf.bytes[*read_idx]);
                 self.body_parser.chunk_size_read--;
-                (*idx)++;
+                (*read_idx)++;
             }
             else
             {
@@ -565,41 +420,41 @@ fn BodyParserState? Parser.step_body(&self, usz* idx, usz* end, DString body)
             break;
 
         case AFTER_CHUNK_CR:
-            if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
             self.body_parser.state = AFTER_CHUNK_LF;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case AFTER_CHUNK_LF:
-            if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
             self.body_parser.state = READ_HEX_NUM;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case ZERO_HEX_CR:
-            if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
             self.body_parser.state = ZERO_HEX_LF;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case ZERO_HEX_LF:
-            if (self.buf.bytes[*idx] != '\n') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\n') return MALFORMED_CRLF?;
             self.body_parser.state = EXTENSION;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case EXTENSION:
-            if (self.buf.bytes[*idx] == '\r') self.body_parser.state = DOUBLE_CR;
+            if (self.buf.bytes[*read_idx] == '\r') self.body_parser.state = DOUBLE_CR;
             break;
 
         case DOUBLE_CR:
-            if (self.buf.bytes[*idx] != '\r') return MALFORMED_CRLF?;
+            if (self.buf.bytes[*read_idx] != '\r') return MALFORMED_CRLF?;
             self.body_parser.state = DOUBLE_LF;
-            (*idx)++;
+            (*read_idx)++;
             break;
 
         case DOUBLE_LF:
-            if (self.buf.bytes[*idx] == '\n') self.body_parser.state = COMPLETE;
+            if (self.buf.bytes[*read_idx] == '\n') self.body_parser.state = COMPLETE;
             break;
 
         case COMPLETE:

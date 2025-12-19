@@ -3,7 +3,7 @@ module req;
 fn void test_incomplete_header() @test
 {
     String input =
-      "HTTP/1.1 200 OK \r\n";
+      "HTTP/1.1 200 OK\r\n";
 
     Parser parser;
     parser.tinit();
@@ -12,13 +12,13 @@ fn void test_incomplete_header() @test
 
     // We should have moved to the header state but we need more bytes.
     test::eq(state, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER);
+    test::eq(parser.state, ParserState.HEADER_KEY);
 }
 
 fn void test_with_allocator() @test
 {
     String input =
-      "HTTP/1.1 200 OK \r\n"
+      "HTTP/1.1 200 OK\r\n"
       "access-control-allow-origin: *\r\n"
       "content-type: application/json \r\n"
       "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
@@ -36,13 +36,13 @@ fn void test_with_allocator() @test
     ParserState result = parser.step(input)!!;
 
     test::eq(result, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.BODY);
+    test::eq(parser.state, ParserState.HEADER_COMPLETE);
 }
 
 fn void test_full_header() @test
 {
     String input =
-      "HTTP/1.1 200 OK \r\n"
+      "HTTP/1.1 200 OK\r\n"
       "access-control-allow-origin: *\r\n"
       "content-type: application/json \r\n"
       "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
@@ -55,8 +55,8 @@ fn void test_full_header() @test
     parser.tinit();
 
     test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.BODY);
     test::@check(parser.buf_str_view().contains(input));
+    test::eq(parser.state, ParserState.HEADER_COMPLETE);
 
     test::eq(*parser.response.get_header_ref("access-control-allow-origin")!!, "*");
     test::eq(*parser.response.get_header_ref("content-type")!!, "application/json");
@@ -72,10 +72,10 @@ fn void test_incremental_read() @test
     parser.tinit();
 
     String input_0 =
-        "HTTP/1.1 200 OK \r\n";
+        "HTTP/1.1 200 OK\r\n";
 
     test::eq(parser.step(input_0)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER);
+    test::eq(parser.state, ParserState.HEADER_KEY);
     test::@check(parser.buf_str_view().contains(input_0));
 
     String input_1 =
@@ -84,33 +84,33 @@ fn void test_incremental_read() @test
       "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n";
 
     test::eq(parser.step(input_1)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER);
+    test::eq(parser.state, ParserState.HEADER_KEY);
     test::@check(parser.buf_str_view().contains(input_1));
 
     String input_2 =
       "transfer-encoding: chunked";
 
     test::eq(parser.step(input_2)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER);
+    test::eq(parser.state, ParserState.HEADER_VALUE);
     test::@check(parser.buf_str_view().contains(input_2));
 
     String input_3 =
       "\r\n\r\n";
 
     test::eq(parser.step(input_3)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.BODY);
+    test::eq(parser.state, ParserState.HEADER_COMPLETE);
     test::@check(parser.buf_str_view().contains(input_3));
 }
 
 fn void test_headers_without_double_crlf() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
+        "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json \r\n"
         "Content-Length: 115 \r\n"
         "Connection: keep-alive \r\n"
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n"
-        "Server: nginx/1.18.0";
+        "Server: nginx/1.18.0 \r\n";
 
     Parser parser;
     parser.tinit();
@@ -144,20 +144,23 @@ fn void test_headers_without_double_crlf() @test
 // valid but the body length is assumed to be 0.
 fn void test_no_body_type() @test
 {
-   String input =
-        "HTTP/1.1 200 OK \r\n"
+    String input =
+        "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json \r\n"
         "Connection: keep-alive \r\n"
         "Date: Wed, 13 Aug 2025 12:00:00 GMT \r\n"
         "Server: nginx/1.18.0 \r\n"
-        "\r\n"
-        "{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}"
+        "\r\n";
+        "{\"status\": \"success\", \"data\": {\"id\": 123,\"name\": \"Test Item\",\"value\": 42},\"message\": \"Item retrieved successfully\"}";
         "0\r\n\r\n";
 
-   Response response;
-   response.tinit();
+    Parser parser;
+    parser.tinit();
 
-   test::eq(response.body_type, BodyType.NULL);
+    // Since we don't have content-length and chunked, then we return complete
+    test::eq(parser.step(input)!!, ParserState.COMPLETE);
+    test::eq(parser.response.body_type, BodyType.NULL);
+    test::eq(parser.mode, ParserMode.COMPLETE);
 }
 
 // According to RFC9112 6.1:
@@ -170,7 +173,7 @@ fn void test_no_body_type() @test
 fn void test_transfer_encoding_priority() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
+        "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json \r\n"
         "Content-Length: 115 \r\n"
         "Connection: keep-alive \r\n"
@@ -189,7 +192,7 @@ fn void test_transfer_encoding_priority() @test
 fn void test_chunked_body_type() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
+        "HTTP/1.1 200 OK\r\n"
         "access-control-allow-origin: *\r\n"
         "content-type: application/json \r\n"
         "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
@@ -213,31 +216,31 @@ fn void test_missing_trailing_crlf() @test
     Parser parser;
     parser.tinit();
 
-    assert(parser.step(input)!! == ParserState.REQUEST_MORE);
+    test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
 }
 
 fn void test_missing_trailing_lf() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
+        "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json \r";
 
     Parser parser;
     parser.tinit();
 
-    assert(parser.step(input)!! == REQUEST_MORE);
+    test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
 }
 
 fn void test_lone_lf() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
-        "Content-Type: application/json \n";
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\n";
 
     Parser parser;
     parser.tinit();
 
-    assert(@catch(parser.step(input)) == MALFORMED_CRLF);
+    test::eq(@catch(parser.step(input)), MALFORMED_CRLF);
 }
 
 fn void test_malformed_crlf_0() @test
@@ -259,7 +262,7 @@ fn void test_malformed_crlf_0() @test
 fn void test_malformed_crlf_1() @test
 {
     String input =
-        "HTTP/1.1 200 OK \r\n"
+        "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json \rfoo\n";
 
     Parser parser;
