@@ -12,23 +12,9 @@ enum ParserState
 {
     STATUS_LINE,
     HEADER,
-    HEADER_READ,
-    HEADER_PROGRESS,
     BODY,
     COMPLETE,
     REQUEST_MORE,
-    EOF,
-
-
-    // header states
-    HEADER_KEY,
-    HEADER_VALUE,
-    AFTER_HEADER_CR,
-    AFTER_HEADER_LF,
-    HEADER_COMPLETE,
-    DOUBLE_CR,
-    DOUBLE_LF,
-
 }
 
 struct Parser
@@ -36,25 +22,13 @@ struct Parser
     Allocator allocator;
     ParserState state;
     io::ByteBuffer buf;
-    ParserMode mode;
     Response response;
 
     StatusLineParser status_line_parser;
     HeaderParser header_parser;
     BodyParser body_parser;
-
-    // Maybe move to a header parser
-    DString tmp_header;
-    DString tmp_header_val;
 }
 
-enum ParserMode
-{
-    STATUS_LINE,
-    HEADER,
-    BODY,
-    COMPLETE,
-}
 
 fn void Parser.init(&self, Allocator allocator)
 {
@@ -66,7 +40,7 @@ fn void Parser.init(&self, Allocator allocator)
     self.header_parser.init(self.allocator);
     self.body_parser.init(self.allocator);
 
-    self.mode = STATUS_LINE;
+    self.state = STATUS_LINE;
 }
 
 fn void Parser.tinit(&self) => self.init(tmem);
@@ -83,18 +57,17 @@ fn void Parser.free(&self)
 
 fn ParserState? Parser.step(&self, char[] input)
 {
-    if (input.len == 0) return EOF;
+    if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!!;
 
     while (self.buf.read_idx < self.buf.write_idx)
     {
-        switch (self.mode)
+        switch (self.state)
         {
             case STATUS_LINE:
                 if (self.status_line_parser.step(&self.buf.read_idx, &self.buf.write_idx, self.buf.bytes, &self.response)! == COMPLETE)
                 {
-                    self.mode = HEADER;
-                    self.state = HEADER_KEY;
+                    self.state = HEADER;
                 }
                 // TODO: THe same request mroe return?
 
@@ -105,11 +78,11 @@ fn ParserState? Parser.step(&self, char[] input)
                 {
                     if (self.response.body_type == NULL)
                     {
-                        self.mode = COMPLETE;
+                        self.state = COMPLETE;
                         return COMPLETE;
                     }
 
-                    self.mode = BODY;
+                    self.state = BODY;
                     break;
                 }
 
@@ -122,6 +95,8 @@ fn ParserState? Parser.step(&self, char[] input)
                 break;
             case COMPLETE:
                 return COMPLETE;
+            default:
+                return REQUEST_MORE;
         }
     }
 

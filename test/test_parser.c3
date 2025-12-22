@@ -12,7 +12,7 @@ fn void test_incomplete_header() @test
 
     // We should have moved to the header state but we need more bytes.
     test::eq(state, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER_KEY);
+    test::eq(parser.state, ParserState.HEADER);
 }
 
 fn void test_with_allocator() @test
@@ -75,7 +75,7 @@ fn void test_incremental_read() @test
         "HTTP/1.1 200 OK\r\n";
 
     test::eq(parser.step(input_0)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER_KEY);
+    test::eq(parser.state, ParserState.HEADER);
     test::@check(parser.buf_str_view().contains(input_0));
 
     String input_1 =
@@ -84,7 +84,7 @@ fn void test_incremental_read() @test
       "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n";
 
     test::eq(parser.step(input_1)!!, ParserState.REQUEST_MORE);
-    test::eq(parser.state, ParserState.HEADER_KEY);
+    test::eq(parser.state, ParserState.HEADER);
     test::@check(parser.buf_str_view().contains(input_1));
 
     String input_2 =
@@ -160,7 +160,7 @@ fn void test_no_body_type() @test
     // Since we don't have content-length and chunked, then we return complete
     test::eq(parser.step(input)!!, ParserState.COMPLETE);
     test::eq(parser.response.body_type, BodyType.NULL);
-    test::eq(parser.mode, ParserMode.COMPLETE);
+    test::eq(parser.state, ParserState.COMPLETE);
 }
 
 // According to RFC9112 6.1:

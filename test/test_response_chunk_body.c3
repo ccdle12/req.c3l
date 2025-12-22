@@ -11,7 +11,6 @@ fn void test_chunk_body_read_0() @test
 
     parser.response.body_type = BodyType.CHUNKED;
     parser.state = ParserState.BODY;
-    parser.mode = ParserMode.BODY;
 
     ParserState result = parser.step(input)!!;
 
@@ -31,7 +30,6 @@ fn void test_chunk_body_read_1() @test
 
     parser.response.body_type = BodyType.CHUNKED;
     parser.state = ParserState.BODY;
-    parser.mode = ParserMode.BODY;
 
     ParserState result = parser.step(input)!!;
 
@@ -51,7 +49,6 @@ fn void test_chunk_body_read_2() @test
 
     parser.response.body_type = BodyType.CHUNKED;
     parser.state = ParserState.BODY;
-    parser.mode = ParserMode.BODY;
 
     ParserState result = parser.step(input_0)!!;
 
@@ -83,7 +80,6 @@ fn void test_chunk_body_read_3() @test
 
     parser.response.body_type = BodyType.CHUNKED;
     parser.state = ParserState.BODY;
-    parser.mode = ParserMode.BODY;
 
     ParserState result = parser.step(input_0)!!;
 
@@ -115,7 +111,6 @@ fn void test_multiple_body_chunks() @test
 
     parser.response.body_type = BodyType.CHUNKED;
     parser.state = ParserState.BODY;
-    parser.mode = ParserMode.BODY;
 
     test::eq(parser.step(input_0)!!, ParserState.REQUEST_MORE);
 

@@ -13,7 +13,7 @@ fn void test_basic_status_line() @test
 
    test::eq(parser.response.http_version, "HTTP/1.1");
    test::eq(parser.response.status_code, 200);
-   test::eq(parser.state, ParserState.HEADER_KEY);
+   test::eq(parser.state, ParserState.HEADER);
 }
 
 fn void test_status_line_with_reason() @test
@@ -28,7 +28,7 @@ fn void test_status_line_with_reason() @test
    test::eq(parser.response.http_version, "HTTP/1.1");
    test::eq(parser.response.status_code, 200);
    test::eq(parser.response.reason_phrase, "OK");
-   test::eq(parser.state, ParserState.HEADER_KEY);
+   test::eq(parser.state, ParserState.HEADER);
 }
 
 fn void test_incorrect_http_version() @test
@@ -61,7 +61,7 @@ fn void test_empty_input() @test
    Parser parser;
    parser.tinit();
 
-   test::eq(parser.step(input)!!, ParserState.EOF);
+   test::eq(parser.step(input)!!, ParserState.REQUEST_MORE);
 }
 
 fn void test_single_malformed_lf() @test
@@ -104,5 +104,5 @@ fn void empty_status_line() @test
     Parser parser;
     parser.tinit();
 
-    assert(parser.step(input)!! == ParserState.EOF);
+    assert(parser.step(input)!! == ParserState.REQUEST_MORE);
 }
