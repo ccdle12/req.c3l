@@ -38,10 +38,13 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-// TODO: I could create pass *io::ByteBuffer, each parser accesses read_idx and write_idx
-fn StatusLineState? StatusLineParser.step(&self, usz* read_idx, usz* write_idx, char[] buf, Response* response)
+fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
-    while (*read_idx < *write_idx)
+    usz *read_idx = &byte_buf.read_idx;
+    usz write_idx = byte_buf.write_idx;
+    char[] buf = byte_buf.bytes;
+
+    while (*read_idx < write_idx)
     {
         switch(self.state)
         {

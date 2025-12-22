@@ -40,9 +40,13 @@ fn void BodyParser.free(&self)
 }
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn BodyParserState? BodyParser.step(&self, usz* read_idx, usz* write_idx, char[] buf, DString body)
+fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, DString body)
 {
-    while (*read_idx < *write_idx)
+    usz *read_idx = &byte_buf.read_idx;
+    usz write_idx = byte_buf.write_idx;
+    char[] buf = byte_buf.bytes;
+
+    while (*read_idx < write_idx)
     {
         switch(self.state)
         {

@@ -38,9 +38,13 @@ fn void HeaderParser.free(&self)
    self.tmp_header_val.free();
 }
 
-fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] buf, Response* response)
+fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
-    while (*read_idx < *write_idx)
+    usz *read_idx = &byte_buf.read_idx;
+    usz write_idx = byte_buf.write_idx;
+    char[] buf = byte_buf.bytes;
+
+    while (*read_idx < write_idx)
     {
         switch(self.state)
         {

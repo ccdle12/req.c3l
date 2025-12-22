@@ -64,7 +64,7 @@ fn ParserState? Parser.step(&self, char[] input)
         switch (self.state)
         {
             case STATUS_LINE:
-                if (self.status_line_parser.step(&self.buf.read_idx, &self.buf.write_idx, self.buf.bytes, &self.response)! == COMPLETE)
+                if (self.status_line_parser.step(&self.buf, &self.response)! == COMPLETE)
                 {
                     self.state = HEADER;
                 }
@@ -72,7 +72,7 @@ fn ParserState? Parser.step(&self, char[] input)
 
                 break;
             case HEADER:
-                HeaderState result = self.header_parser.step(&self.buf.read_idx, &self.buf.write_idx, self.buf.bytes, &self.response)!;
+                HeaderState result = self.header_parser.step(&self.buf, &self.response)!;
                 if (result == COMPLETE)
                 {
                     if (self.response.body_type == NULL)
@@ -90,7 +90,7 @@ fn ParserState? Parser.step(&self, char[] input)
                 break;
             case BODY:
                 // TODO: This is only a chunk body stepper.
-                BodyParserState result = self.body_parser.step(&self.buf.read_idx, &self.buf.write_idx, self.buf.bytes, self.response.body)!;
+                BodyParserState result = self.body_parser.step(&self.buf, self.response.body)!;
                 if (result == COMPLETE) return COMPLETE;
                 break;
             case COMPLETE:
