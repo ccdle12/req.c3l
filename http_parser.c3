@@ -92,6 +92,7 @@ fn ParserState? Parser.step(&self, char[] input)
             case BODY:
                 // TODO: This is only a chunk body stepper.
                 BodyParserState result = self.body_parser.step(&self.buf.read_idx, &self.buf.write_idx, self.buf.bytes, self.response.body)!;
+                if (result == COMPLETE) return COMPLETE;
                 break;
             case COMPLETE:
                 return COMPLETE;

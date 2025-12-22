@@ -134,6 +134,7 @@ fn BodyParserState? BodyParser.step(&self, usz* read_idx, usz* write_idx, char[]
             break;
 
         case COMPLETE:
+            (*read_idx)++;
             return self.state;
 
         default:

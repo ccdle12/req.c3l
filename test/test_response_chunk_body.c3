@@ -87,13 +87,14 @@ fn void test_chunk_body_read_3() @test
     test::eq(parser.body_parser.state, BodyParserState.EXTENSION);
 
     //THIS SHOULD BE COMPLETE BECAUSE OF THE FINAL DOUBLE CRLF
-    //String input_1 =
-    //    "\r\n";
-    //test::eq(parser.step(input_1)!!, ParserState.COMPLETE);
+    String input_1 =
+        "\r\n";
+    test::eq(parser.step(input_1)!!, ParserState.COMPLETE);
 }
 
 fn void test_multiple_body_chunks() @test
 {
+    // TODO: I can move this test to a BodyParser state
     // ANY bytes after the chunk size should be counted as bytes that should be
     // read, even if they are crlf.
     String input_0 =
@@ -119,11 +120,9 @@ fn void test_multiple_body_chunks() @test
     test::@check(parser.response.body.str_view().contains(" in\r\n\r\nchunks."));
     test::eq(parser.body_parser.state, BodyParserState.READ_HEX_NUM);
 
-    // TODO: Not working
-    //String input_1 =
-    //    "0\r\n"
-    //    "\r\n";
+    String input_1 =
+        "0\r\n"
+        "\r\n";
 
-    //test::eq(parser.step(input_1)!!, ParserState.COMPLETE);
-    //io::printfn("body in test: %s", parser.response.body.str_view());
+    test::eq(parser.step(input_1)!!, ParserState.COMPLETE);
 }
