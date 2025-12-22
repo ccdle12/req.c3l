@@ -35,7 +35,7 @@ fn void test_chunk_body_read_1() @test
 
     test::eq(result, ParserState.REQUEST_MORE);
     test::@check(parser.response.body.str_view().contains("Wiki"));
-    test::eq(parser.body_parser.state, BodyParserState.READ_HEX_NUM);
+    test::eq(parser.body_parser.state, BodyParserState.HEX_NUM);
 }
 
 fn void test_chunk_body_read_2() @test
@@ -64,7 +64,7 @@ fn void test_chunk_body_read_2() @test
     test::@check(parser.response.body.str_view().contains("Wiki"));
 
     // The parser should now be ready for the next hex num.
-    test::eq(parser.body_parser.state, BodyParserState.READ_HEX_NUM);
+    test::eq(parser.body_parser.state, BodyParserState.HEX_NUM);
 }
 
 fn void test_chunk_body_read_3() @test
@@ -118,7 +118,7 @@ fn void test_multiple_body_chunks() @test
     test::@check(parser.response.body.str_view().contains("Wiki"));
     test::@check(parser.response.body.str_view().contains("pedia"));
     test::@check(parser.response.body.str_view().contains(" in\r\n\r\nchunks."));
-    test::eq(parser.body_parser.state, BodyParserState.READ_HEX_NUM);
+    test::eq(parser.body_parser.state, BodyParserState.HEX_NUM);
 
     String input_1 =
         "0\r\n"
