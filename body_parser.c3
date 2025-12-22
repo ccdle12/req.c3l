@@ -4,12 +4,12 @@ import std::io;
 
 enum BodyParserState
 {
-    READ_HEX_NUM,
+    HEX_NUM,
     HEX_CR,
     HEX_LF,
+    READ_CHUNK,
     CHUNK_CR,
     CHUNK_LF,
-    READ_CHUNK,
     ZERO_HEX_CR,
     ZERO_HEX_LF,
     EXTENSION,
@@ -30,7 +30,7 @@ struct BodyParser
 fn void BodyParser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
-    self.state = READ_HEX_NUM;
+    self.state = HEX_NUM;
     self.chunk_size_cache.init(self.allocator);
 }
 
@@ -50,7 +50,7 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
     {
         switch(self.state)
         {
-            case READ_HEX_NUM:
+            case HEX_NUM:
                 if (buf[*read_idx] != '\r')
                 {
                     self.chunk_size_cache.append_char(buf[*read_idx]);
@@ -106,7 +106,7 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
 
             case CHUNK_LF:
                 if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-                self.state = READ_HEX_NUM;
+                self.state = HEX_NUM;
                 (*read_idx)++;
                 break;
 
