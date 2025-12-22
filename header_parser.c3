@@ -6,12 +6,12 @@ enum HeaderState
 {
     HEADER_KEY,
     HEADER_VALUE,
-    AFTER_HEADER_CR,
-    AFTER_HEADER_LF,
+    HEADER_CR,
+    HEADER_LF,
     DOUBLE_CR,
     DOUBLE_LF,
-    COMPLETE,
     EOF,
+    COMPLETE,
 }
 
 struct HeaderParser
@@ -19,7 +19,7 @@ struct HeaderParser
     Allocator allocator;
     HeaderState state;
 
-    DString tmp_header;
+    DString tmp_header_key;
     DString tmp_header_val;
 }
 
@@ -28,17 +28,16 @@ fn void HeaderParser.init(&self, Allocator allocator)
     self.allocator = allocator;
     self.state = HEADER_KEY;
 
-    self.tmp_header.init(self.allocator);
+    self.tmp_header_key.init(self.allocator);
     self.tmp_header_val.init(self.allocator);
 }
 
 fn void HeaderParser.free(&self)
 {
-   self.tmp_header.free();
+   self.tmp_header_key.free();
    self.tmp_header_val.free();
 }
 
-// TODO: Maybe make these StatusLineStates?
 fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] buf, Response* response)
 {
     while (*read_idx < *write_idx)
@@ -52,7 +51,6 @@ fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] b
                 break;
             }
 
-            // TODO: Need to return error if whitespace before ':'
             if (buf[*read_idx] == ':')
             {
                 self.state = HEADER_VALUE;
@@ -60,16 +58,16 @@ fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] b
                 break;
             }
 
-            self.tmp_header.append_char(buf[*read_idx]);
+            self.tmp_header_key.append_char(buf[*read_idx]);
             (*read_idx)++;
             break;
 
         case HEADER_VALUE:
-            // Catching if we hav a LF out of place, passes to the CR handler
+            // If we have a LF out of place, it passes to the CR handler
             // to return the error.
             if (buf[*read_idx] == '\n')
             {
-                self.state = AFTER_HEADER_CR;
+                self.state = HEADER_CR;
                 break;
             }
 
@@ -80,27 +78,26 @@ fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] b
                 break;
             }
 
-            // TODO: Need to check if this memory frees correctly?
-            response.parse_and_set_kv(self.tmp_header, self.tmp_header_val)!;
+            response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
 
-            self.tmp_header.clear();
+            self.tmp_header_key.clear();
             self.tmp_header_val.clear();
 
-            // Set body type as it the headers arrive, we will enforce RFC 9112
-            // 6.1 - Transfer Encoding has precendence over Content-Length.
+            // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
+            // Transfer Encoding has precendence over Content-Length.
             response.set_body_type();
 
-            self.state = AFTER_HEADER_CR;
+            self.state = HEADER_CR;
 
             break;
 
-        case AFTER_HEADER_CR:
+        case HEADER_CR:
             if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
             (*read_idx)++;
-            self.state = AFTER_HEADER_LF;
+            self.state = HEADER_LF;
             break;
 
-        case AFTER_HEADER_LF:
+        case HEADER_LF:
             if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
             (*read_idx)++;
             self.state = HEADER_KEY;
@@ -123,6 +120,5 @@ fn HeaderState? HeaderParser.step(&self, usz* read_idx, usz* write_idx, char[] b
         }
     }
 
-    io::printfn("returning request more?");
     return EOF;
 }
