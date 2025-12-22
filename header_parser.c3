@@ -48,79 +48,79 @@ fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* res
     {
         switch(self.state)
         {
-        case HEADER_KEY:
-            if (buf[*read_idx] == '\r')
-            {
-                self.state = DOUBLE_CR;
-                break;
-            }
+            case HEADER_KEY:
+                if (buf[*read_idx] == '\r')
+                {
+                    self.state = DOUBLE_CR;
+                    break;
+                }
 
-            if (buf[*read_idx] == ':')
-            {
-                self.state = HEADER_VALUE;
+                if (buf[*read_idx] == ':')
+                {
+                    self.state = HEADER_VALUE;
+                    (*read_idx)++;
+                    break;
+                }
+
+                self.tmp_header_key.append_char(buf[*read_idx]);
                 (*read_idx)++;
                 break;
-            }
 
-            self.tmp_header_key.append_char(buf[*read_idx]);
-            (*read_idx)++;
-            break;
+            case HEADER_VALUE:
+                // If we have a LF out of place, it passes to the CR handler
+                // to return the error.
+                if (buf[*read_idx] == '\n')
+                {
+                    self.state = HEADER_CR;
+                    break;
+                }
 
-        case HEADER_VALUE:
-            // If we have a LF out of place, it passes to the CR handler
-            // to return the error.
-            if (buf[*read_idx] == '\n')
-            {
+                if (buf[*read_idx] != '\r')
+                {
+                    self.tmp_header_val.append_char(buf[*read_idx]);
+                    (*read_idx)++;
+                    break;
+                }
+
+                response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
+
+                self.tmp_header_key.clear();
+                self.tmp_header_val.clear();
+
+                // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
+                // Transfer Encoding has precendence over Content-Length.
+                response.set_body_type();
+
                 self.state = HEADER_CR;
-                break;
-            }
 
-            if (buf[*read_idx] != '\r')
-            {
-                self.tmp_header_val.append_char(buf[*read_idx]);
+                break;
+
+            case HEADER_CR:
+                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
                 (*read_idx)++;
+                self.state = HEADER_LF;
                 break;
-            }
 
-            response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
+            case HEADER_LF:
+                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                (*read_idx)++;
+                self.state = HEADER_KEY;
+                break;
 
-            self.tmp_header_key.clear();
-            self.tmp_header_val.clear();
+            case DOUBLE_CR:
+                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                (*read_idx)++;
+                self.state = DOUBLE_LF;
+                break;
 
-            // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
-            // Transfer Encoding has precendence over Content-Length.
-            response.set_body_type();
+            case DOUBLE_LF:
+                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                (*read_idx)++;
+                self.state = COMPLETE;
+                return self.state;
 
-            self.state = HEADER_CR;
-
-            break;
-
-        case HEADER_CR:
-            if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-            (*read_idx)++;
-            self.state = HEADER_LF;
-            break;
-
-        case HEADER_LF:
-            if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-            (*read_idx)++;
-            self.state = HEADER_KEY;
-            break;
-
-        case DOUBLE_CR:
-            if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-            (*read_idx)++;
-            self.state = DOUBLE_LF;
-            break;
-
-        case DOUBLE_LF:
-            if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-            (*read_idx)++;
-            self.state = COMPLETE;
-            return self.state;
-
-        default:
-            break;
+            default:
+                break;
         }
     }
 
