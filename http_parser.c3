@@ -20,10 +20,9 @@ enum ParserState
 struct Parser
 {
     Allocator allocator;
-    ParserState state;
     io::ByteBuffer buf;
+    ParserState state;
     Response response;
-
     StatusLineParser status_line_parser;
     HeaderParser header_parser;
     BodyParser body_parser;
@@ -58,7 +57,7 @@ fn void Parser.free(&self)
 fn ParserState? Parser.step(&self, char[] input)
 {
     if (input.len == 0) return REQUEST_MORE;
-    self.buf.write(input)!!;
+    self.buf.write(input)!;
 
     while (self.buf.read_idx < self.buf.write_idx)
     {
