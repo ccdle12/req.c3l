@@ -45,101 +45,101 @@ fn BodyParserState? BodyParser.step(&self, usz* read_idx, usz* write_idx, char[]
 {
     while (*read_idx < *write_idx)
     {
-    switch(self.state)
-    {
-        case READ_HEX_NUM:
-            if (buf[*read_idx] != '\r')
-            {
-                self.chunk_size_cache.append_char(buf[*read_idx]);
+        switch(self.state)
+        {
+            case READ_HEX_NUM:
+                if (buf[*read_idx] != '\r')
+                {
+                    self.chunk_size_cache.append_char(buf[*read_idx]);
+                    (*read_idx)++;
+                    break;
+                }
+
+                ulong chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
+                self.chunk_size_read = chunk_size;
+                self.chunk_size_cache.clear();
+
+                if (self.chunk_size_read == 0)
+                {
+                    self.state = ZERO_HEX_CR;
+                }
+                else
+                {
+                    self.state = AFTER_HEX_CR;
+                }
+
+                break;
+
+            case AFTER_HEX_CR:
+                self.state = AFTER_HEX_LF;
                 (*read_idx)++;
                 break;
-            }
 
-            ulong chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
-            self.chunk_size_read = chunk_size;
-            self.chunk_size_cache.clear();
-
-            if (self.chunk_size_read == 0)
-            {
-                self.state = ZERO_HEX_CR;
-            }
-            else
-            {
-                self.state = AFTER_HEX_CR;
-            }
-
-            break;
-
-        case AFTER_HEX_CR:
-            self.state = AFTER_HEX_LF;
-            (*read_idx)++;
-            break;
-
-        case AFTER_HEX_LF:
-            if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-            self.state = READ_CHUNK;
-            (*read_idx)++;
-            break;
-
-        case READ_CHUNK:
-            if (self.chunk_size_read > 0)
-            {
-                body.append_char(buf[*read_idx]);
-                self.chunk_size_read--;
+            case AFTER_HEX_LF:
+                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                self.state = READ_CHUNK;
                 (*read_idx)++;
-            }
-            else
-            {
-                self.state = AFTER_CHUNK_CR;
-            }
+                break;
 
-            break;
+            case READ_CHUNK:
+                if (self.chunk_size_read > 0)
+                {
+                    body.append_char(buf[*read_idx]);
+                    self.chunk_size_read--;
+                    (*read_idx)++;
+                }
+                else
+                {
+                    self.state = AFTER_CHUNK_CR;
+                }
 
-        case AFTER_CHUNK_CR:
-            if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-            self.state = AFTER_CHUNK_LF;
-            (*read_idx)++;
-            break;
+                break;
 
-        case AFTER_CHUNK_LF:
-            if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-            self.state = READ_HEX_NUM;
-            (*read_idx)++;
-            break;
+            case AFTER_CHUNK_CR:
+                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                self.state = AFTER_CHUNK_LF;
+                (*read_idx)++;
+                break;
 
-        case ZERO_HEX_CR:
-            if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-            self.state = ZERO_HEX_LF;
-            (*read_idx)++;
-            break;
+            case AFTER_CHUNK_LF:
+                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                self.state = READ_HEX_NUM;
+                (*read_idx)++;
+                break;
 
-        case ZERO_HEX_LF:
-            if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-            self.state = EXTENSION;
-            (*read_idx)++;
-            break;
+            case ZERO_HEX_CR:
+                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                self.state = ZERO_HEX_LF;
+                (*read_idx)++;
+                break;
 
-        case EXTENSION:
-            if (buf[*read_idx] == '\r') self.state = DOUBLE_CR;
-            break;
+            case ZERO_HEX_LF:
+                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                self.state = EXTENSION;
+                (*read_idx)++;
+                break;
 
-        case DOUBLE_CR:
-            if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-            self.state = DOUBLE_LF;
-            (*read_idx)++;
-            break;
+            case EXTENSION:
+                if (buf[*read_idx] == '\r') self.state = DOUBLE_CR;
+                break;
 
-        case DOUBLE_LF:
-            if (buf[*read_idx] == '\n') self.state = COMPLETE;
-            break;
+            case DOUBLE_CR:
+                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                self.state = DOUBLE_LF;
+                (*read_idx)++;
+                break;
 
-        case COMPLETE:
-            (*read_idx)++;
-            return self.state;
+            case DOUBLE_LF:
+                if (buf[*read_idx] == '\n') self.state = COMPLETE;
+                break;
 
-        default:
-            return BodyParserState.EOF;
-    }
+            case COMPLETE:
+                (*read_idx)++;
+                return self.state;
+
+            default:
+                return BodyParserState.EOF;
+        }
     }
 
     return BodyParserState.EOF;
