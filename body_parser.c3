@@ -40,7 +40,7 @@ fn void BodyParser.free(&self)
 }
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, DString body)
+fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
     usz write_idx = byte_buf.write_idx;
@@ -87,7 +87,7 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, DString bod
             case READ_CHUNK:
                 if (self.chunk_size_read > 0)
                 {
-                    body.append_char(buf[*read_idx]);
+                    response.body.append_char(buf[*read_idx]);
                     self.chunk_size_read--;
                     (*read_idx)++;
                 }
