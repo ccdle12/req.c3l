@@ -55,7 +55,7 @@ fn void test_chunk_body_read_2() @test
     test::eq(result, ParserState.REQUEST_MORE);
 
     // TODO: It shouldn't be trying to read hex num at this point, its just REQUEST_MORE
-    test::eq(parser.body_parser.state, BodyParserState.AFTER_CHUNK_LF);
+    test::eq(parser.body_parser.state, BodyParserState.CHUNK_LF);
 
     String input_1 = "\n";
     test::eq(parser.step(input_1)!!, ParserState.REQUEST_MORE);
@@ -86,9 +86,9 @@ fn void test_chunk_body_read_3() @test
     test::eq(result, ParserState.REQUEST_MORE);
     test::eq(parser.body_parser.state, BodyParserState.EXTENSION);
 
-    //THIS SHOULD BE COMPLETE BECAUSE OF THE FINAL DOUBLE CRLF
     String input_1 =
         "\r\n";
+
     test::eq(parser.step(input_1)!!, ParserState.COMPLETE);
 }
 

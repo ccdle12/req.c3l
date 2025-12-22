@@ -5,12 +5,11 @@ import std::io;
 enum BodyParserState
 {
     READ_HEX_NUM,
-    AFTER_HEX_CR,
-    AFTER_HEX_LF,
-    AFTER_CHUNK_CR,
-    AFTER_CHUNK_LF,
+    HEX_CR,
+    HEX_LF,
+    CHUNK_CR,
+    CHUNK_LF,
     READ_CHUNK,
-    READ_CHUNK_FINISHED,
     ZERO_HEX_CR,
     ZERO_HEX_LF,
     EXTENSION,
@@ -65,17 +64,17 @@ fn BodyParserState? BodyParser.step(&self, usz* read_idx, usz* write_idx, char[]
                 }
                 else
                 {
-                    self.state = AFTER_HEX_CR;
+                    self.state = HEX_CR;
                 }
 
                 break;
 
-            case AFTER_HEX_CR:
-                self.state = AFTER_HEX_LF;
+            case HEX_CR:
+                self.state = HEX_LF;
                 (*read_idx)++;
                 break;
 
-            case AFTER_HEX_LF:
+            case HEX_LF:
                 if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
                 self.state = READ_CHUNK;
                 (*read_idx)++;
@@ -90,18 +89,18 @@ fn BodyParserState? BodyParser.step(&self, usz* read_idx, usz* write_idx, char[]
                 }
                 else
                 {
-                    self.state = AFTER_CHUNK_CR;
+                    self.state = CHUNK_CR;
                 }
 
                 break;
 
-            case AFTER_CHUNK_CR:
+            case CHUNK_CR:
                 if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-                self.state = AFTER_CHUNK_LF;
+                self.state = CHUNK_LF;
                 (*read_idx)++;
                 break;
 
-            case AFTER_CHUNK_LF:
+            case CHUNK_LF:
                 if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
                 self.state = READ_HEX_NUM;
                 (*read_idx)++;
