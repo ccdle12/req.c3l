@@ -1,116 +1,106 @@
 module req;
 
-import std::net::url;
-import std::net::tcp;
 import std::io;
-import tora;
 
-// TODO: Is there a way I can make this NOT InStream socket but make it a comptime where its either Socket or InStream?
-struct HTTPParser
+const usz MAX_SIZE = 4096;
+const usz INITIAL_CAPACITY = 4096;
+const usz CRLF_OFFSET = 2;
+
+faultdef MALFORMED_CRLF;
+
+enum ParserState
 {
-    DString dyn_buf;
-    TcpSocket socket;
+    STATUS_LINE,
+    HEADER,
+    BODY,
+    COMPLETE,
+    REQUEST_MORE,
 }
 
-fn void HTTPParser.init(&self, TcpSocket socket)
+struct Parser
 {
-    self.dyn_buf = dstring::temp();
-    self.socket = socket;
+    Allocator allocator;
+    io::ByteBuffer buf;
+    ParserState state;
+    Response response;
+    StatusLineParser status_line_parser;
+    HeaderParser header_parser;
+    BodyParser body_parser;
 }
 
 
-fn void? HTTPParser.read_headers(&self, Response* response)
+fn void Parser.init(&self, Allocator allocator)
 {
-    while (!contains_crlf(&self.dyn_buf))
+    self.allocator = allocator;
+    self.buf.init(self.allocator, MAX_SIZE, INITIAL_CAPACITY);
+
+    self.response.init(self.allocator);
+    self.status_line_parser.init(self.allocator);
+    self.header_parser.init(self.allocator);
+    self.body_parser.init(self.allocator);
+
+    self.state = STATUS_LINE;
+}
+
+fn void Parser.tinit(&self) => self.init(tmem);
+
+fn void Parser.free(&self)
+{
+   self.buf.free();
+   self.response.free();
+
+   self.status_line_parser.free();
+   self.header_parser.free();
+   self.body_parser.free();
+}
+
+fn ParserState? Parser.step(&self, char[] input)
+{
+    if (input.len == 0) return REQUEST_MORE;
+    self.buf.write(input)!;
+
+    while (self.buf.read_idx < self.buf.write_idx)
     {
-        if (self.append_buf()! == 0) return ZERO_BYTES_READ?;
-    }
-
-    response.deserialize_headers(self.dyn_buf.str_view());
-}
-
-fn String HTTPParser.str_view(&self) => self.dyn_buf.str_view() @inline;
-
-fn void? HTTPParser.read_body(&self, Response* response)
-{
-    switch(response.body_type)
-    {
-        case NONE:
-            // TODO: NEED TO HANDLE THIS AS A FAILED PARSE
-            return ZERO_BYTES_READ?;
-        case CONTENT_LENGTH:
-            self.read_content_length_body(response)!;
-        case CHUNKED:
-            self.read_chunked_body(response)!;
-    }
-}
-
-fn void? HTTPParser.read_content_length_body(&self, Response* response) @inline @private
-{
-    usz clrf_idx = find_end_of_crlf(&self.dyn_buf)!;
-
-    if (clrf_idx + response.headers.content_length > self.dyn_buf.len())
-    {
-        if (self.append_buf()! == 0) return;
-    }
-
-    // TODO: Safety, Need to check if clrf_idx and self.headers.content_lenght is less than dyn_buf?
-    String view = self.dyn_buf.str_view();
-    response.body = view[clrf_idx:response.headers.content_length];
-}
-
-fn void? HTTPParser.read_chunked_body(&self, Response* response) @inline @private
-{
-    usz clrf_idx = find_end_of_crlf(&self.dyn_buf)!;
-
-    DString chunk_buf = dstring::temp();
-    usz chunk_offset = clrf_idx;
-
-    while (true)
-    {
-        // TODO: Figure out this split safely
-        String view = self.dyn_buf.str_view();
-        String[] chunk_split = view[chunk_offset..].tsplit("\r\n");
-
-        usz chunk_byte_len = chunk_split[0].len;
-        ulong? chunk_size = chunk_split[0].to_uint(base: 16);
-
-        // TODO: Think through if this is the right thing to do. If we are
-        // unable to read the next chunk size, just return.
-        if (catch excuse = chunk_size) break;
-        if (chunk_size == 0) break;
-
-        // TODO: Scary
-        while (clrf_idx + chunk_size > self.dyn_buf.len())
+        switch (self.state)
         {
-            usz? bytes_read = self.append_buf()!;
-            if (try bytes_read)
-            {
-                if (bytes_read == 0) return;
-            }
+            case STATUS_LINE:
+                if (self.status_line_parser.step(&self.buf, &self.response)! == COMPLETE)
+                {
+                    self.state = HEADER;
+                }
+                // TODO: THe same request mroe return?
 
+                break;
+            case HEADER:
+                HeaderState result = self.header_parser.step(&self.buf, &self.response)!;
+                if (result == COMPLETE)
+                {
+                    if (self.response.body_type == NULL)
+                    {
+                        self.state = COMPLETE;
+                        return COMPLETE;
+                    }
+
+                    self.state = BODY;
+                    break;
+                }
+
+                if (result == EOF) return REQUEST_MORE;
+
+                break;
+            case BODY:
+                // TODO: This is only a chunk body stepper.
+                BodyParserState result = self.body_parser.step(&self.buf, &self.response)!;
+                if (result == COMPLETE) return COMPLETE;
+                break;
+            case COMPLETE:
+                return COMPLETE;
+            default:
+                return REQUEST_MORE;
         }
-
-        chunk_offset = clrf_idx + chunk_byte_len;
-        chunk_buf.append_chars(view[chunk_offset:chunk_size]);
     }
 
-    response.body = chunk_buf.str_view();
-    tora::debug("response: \n%s", response.str_view());
-
+    return REQUEST_MORE;
 }
 
-fn usz? HTTPParser.append_buf(&self) @private
-{
-    char[4096] buf;
-    usz bytes_read = self.socket.read(&buf)!;
-
-    // TODO: MAYBE THIS SHOULD BE A FAILED READ?
-    //if (bytes_read == 0) return;
-
-    // TODO: bytes_read can never be greater than in_buf len?
-    self.dyn_buf.append_chars((String) buf[..bytes_read]);
-
-    return bytes_read;
-
-}
+fn String Parser.buf_str_view(&self) => (String) self.buf.bytes;

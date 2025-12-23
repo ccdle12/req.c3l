@@ -1,161 +1,132 @@
 module req;
 
-import tora;
+import std::collections::map;
 
-struct Response
-{
-    String version;
-    String status;
-    String body;
-    Headers headers;
-    BodyType body_type;
-}
+faultdef INVALID_PROTOCOL_VERSION,
+         MISSING_CRLF,
+         MALFORMED_HEADER,
+         INVALID_HEADER_KEY_SYMBOL,
+         MALFORMED_STATUS_LINE,
+         INVALID_STATUS_CODE,
+         INVALID_TRAILING_SPACE;
 
-fn void Response.deserialize_headers(&self, char[] headers)
-{
-    String[] split_headers = ((String) headers).tsplit("\r\n");
-    String[] status = split_headers[0].tsplit(" ");
-
-    self.version = status[0];
-    self.status = status[1];
-
-    foreach (&line : split_headers[1..])
-    {
-        // Split into two halves on the first occurence of `:`
-        String[] kv = line.tsplit(":", 2);
-
-        String key = kv[0];
-        key.convert_to_lower();
-
-        if (CONTENT_TYPE == key)
-        {
-            self.headers.content_type = kv[1].trim();
-        }
-
-        if (DATE == key)
-        {
-            self.headers.date = kv[1].trim();
-        }
-
-        if (VIA == key)
-        {
-            self.headers.via = kv[1].trim();
-        }
-
-        if (VARY == key)
-        {
-            self.headers.vary = kv[1].trim();
-        }
-
-        if (SERVER == key)
-        {
-            self.headers.server = kv[1].trim();
-        }
-
-        if (CONTENT_LENGTH == key)
-        {
-            // TODO: Handle the unwrap
-            self.headers.content_length = kv[1].trim().to_uint()!!;
-        }
-
-        if (CONNECTION == key)
-        {
-            self.headers.connection = kv[1].trim();
-        }
-
-        if (TRANSFER_ENCODING == key)
-        {
-            self.headers.transfer_encoding = kv[1].trim();
-        }
-    }
-
-    self.set_body_parse_state();
-}
-
-fn String Response.str_view(&self)
-{
-    DString res = dstring::temp();
-    res.appendf("%s ", self.version);
-    res.appendf("%s\r\n", self.status);
-
-    if (self.headers.host.len > 0)
-    {
-        res.appendf("Host: %s\r\n", self.headers.host);
-    }
-
-    if (self.headers.user_agent.len > 0)
-    {
-        res.appendf("User-Agent: %s\r\n", self.headers.user_agent);
-    }
-
-    if (self.headers.content_length > 0)
-    {
-        res.appendf("Content-Length: %s\r\n", self.headers.content_length);
-    }
-
-    res.appendf("Content-Type: %s\r\n", self.headers.content_type);
-
-    if (self.headers.connection.len > 0)
-    {
-        res.appendf("Connection: %s\r\n", self.headers.connection);
-    }
-
-    if (self.headers.date.len > 0)
-    {
-        res.appendf("Date: %s\r\n", self.headers.date);
-    }
-
-    if (self.headers.server.len > 0)
-    {
-        res.appendf("Server: %s\r\n", self.headers.server);
-    }
-
-    if (self.headers.vary.len > 0)
-    {
-        res.appendf("Vary: %s\r\n", self.headers.vary);
-    }
-
-    if (self.headers.via.len > 0)
-    {
-        res.appendf("Via: %s\r\n", self.headers.via);
-    }
-
-    if (self.headers.transfer_encoding.len > 0)
-    {
-        res.appendf("Transfer-Encoding: %s\r\n", self.headers.transfer_encoding);
-    }
-
-    res.appendf(CRLF);
-
-    if (self.body.len > 0)
-    {
-        res.appendf("Body: %s\r\n", self.body);
-    }
-
-    return res.str_view();
-}
+const String HTTP10 = "HTTP/1.0";
+const String HTTP11 = "HTTP/1.1";
+const String CONTENT_LENGTH = "content-length";
+const String TRANSFER_ENCODING = "transfer-encoding";
 
 enum BodyType
 {
-    NONE,
-    CONTENT_LENGTH,
+    NULL,
     CHUNKED,
+    CONTENT_LENGTH,
 }
 
-fn void Response.set_body_parse_state(&self)
+struct Response
 {
-    if (self.headers.transfer_encoding == CHUNKED_ENCODING)
+    Allocator allocator;
+
+    // Status Line.
+    String http_version;
+    int status_code;
+
+    // Optional according to RFC 9112.
+    String reason_phrase;
+
+    LinkedHashMap{String, String} headers;
+
+    BodyType body_type;
+    DString body;
+}
+
+fn void Response.init(&self, Allocator allocator)
+{
+    self.allocator = allocator;
+    self.headers.init(self.allocator);
+    self.body.init(self.allocator, MAX_SIZE);
+}
+
+fn void Response.tinit(&self) => self.init(tmem);
+
+fn void Response.free(&self)
+{
+    self.headers.free();
+    self.body.free();
+}
+
+fn void? Response.parse_status_code(&self, String status_code)
+{
+    if (status_code.len > 3) return INVALID_STATUS_CODE?;
+    self.status_code = status_code.to_integer(int, 10)!;
+    return;
+}
+
+fn void? Response.parse_http_protocol(&self, String protocol)
+{
+    if (protocol != HTTP11 && protocol != HTTP10)
     {
-        self.body_type = CHUNKED;
-        return;
+        return INVALID_PROTOCOL_VERSION?;
     }
 
-    if (self.headers.content_length > 0)
+    self.http_version = protocol;
+
+    return;
+}
+
+fn void? Response.parse_header(&self, String key)
+{
+    if (key[key.len - 1] == ' ') return INVALID_TRAILING_SPACE?;
+
+    foreach(c : key)
+    {
+        if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL?;
+    }
+}
+
+fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_value)
+{
+    String key = header_key.copy_str(self.allocator).to_lower_copy(self.allocator);
+
+    self.parse_header(key)!;
+    String value = header_value.copy_str(self.allocator).trim();
+
+    self.headers.set(key, value);
+}
+
+// TODO: This is naive setting for now, we need to be able to handle:
+// - compress
+// - deflate
+// - gzip
+fn void Response.set_body_type(&self)
+{
+    if (self.headers.has_key("content-length")) self.body_type = CONTENT_LENGTH;
+    if (self.headers.has_key("transfer-encoding")) self.body_type = CHUNKED;
+    return;
+}
+
+fn String*? Response.get_header_ref(&self, String key)
+{
+    String k = key.trim().to_lower_copy(self.allocator);
+    defer allocator::free(self.allocator, k);
+
+    return self.headers.get_ref(k)!;
+}
+
+<* According to RFC9112 6.1:
+   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
+   over Content-Length.
+*>
+fn void Response.parse_body_type(&self)
+{
+    fault content_length_excuse = @catch(self.headers.get(CONTENT_LENGTH));
+    if (!content_length_excuse)
     {
         self.body_type = CONTENT_LENGTH;
-        return;
     }
 
-    self.body_type = NONE;
-    return;
+    fault chunked_excuse = @catch(self.headers.get(TRANSFER_ENCODING));
+    if (!chunked_excuse)
+    {
+        self.body_type = CHUNKED;
+    }
 }
