@@ -59,8 +59,7 @@ fn void invalid_status_code_length() @test
 {
     String input = "HTTP/1.1 40001 OK\r\n";
 
-   fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
-
+    fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
     test::eq(excuse, INVALID_STATUS_CODE);
 }
 
@@ -104,7 +103,7 @@ fn void test_single_malformed_lf() @test
 fn void test_invalid_status_code() @test
 {
     String input = "HTTP/1.1 foo OK\r\n";
-    fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
 
+    fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
     test::eq(excuse, INVALID_STATUS_CODE);
 }
