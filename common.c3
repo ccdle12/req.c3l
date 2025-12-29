@@ -46,6 +46,9 @@ fn void? handle_lf(char c, usz* read_idx)
     return handle_crlf('\n', c, read_idx)!;
 }
 
+<*
+  Internal function for both cr and lf.
+*>
 fn void? handle_crlf(char target, char c, usz* read_idx) @private
 {
     if (c != target) return MALFORMED_CRLF?;
