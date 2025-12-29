@@ -38,7 +38,8 @@ fn void test_chunk_delayed_lf() @test
         "4\r\n"
         "Wiki\r";
 
-    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state) {
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
         test::eq(*state, BodyParserState.EOF);
         test::eq(parser.state, BodyParserState.CHUNK_LF);
 
