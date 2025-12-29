@@ -43,11 +43,7 @@ fn void test_invalid_header_key_symbols() @test
 
 fn void test_invalid_whitespace_in_header() @test
 {
-
     String input = "Content-Type : \r\n";
     fault excuse = @catch(@header_parser_test(input; Response response, HeaderParser parser, HeaderState state){});
     test::eq(excuse, INVALID_TRAILING_SPACE);
 }
-
-
-//// Test for errors. ////
