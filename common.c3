@@ -29,3 +29,23 @@ fn bool is_tchar(char c)
 
     return false;
 }
+
+<*
+  Common function to handle a CR when stepping in the parsers.
+*>
+fn void? handle_cr(char c, usz* read_idx)
+{
+    if (c != '\r') return MALFORMED_CRLF?;
+    (*read_idx)++;
+    return;
+}
+
+<*
+  Common function to handle an LF when stepping in the parsers.
+*>
+fn void? handle_lf(char c, usz* read_idx)
+{
+    if (c != '\n') return MALFORMED_CRLF?;
+    (*read_idx)++;
+    return;
+}

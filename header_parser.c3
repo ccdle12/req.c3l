@@ -96,26 +96,22 @@ fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* res
                 break;
 
             case HEADER_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-                (*read_idx)++;
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = HEADER_LF;
                 break;
 
             case HEADER_LF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-                (*read_idx)++;
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = HEADER_KEY;
                 break;
 
             case DOUBLE_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-                (*read_idx)++;
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = DOUBLE_LF;
                 break;
 
             case DOUBLE_LF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
-                (*read_idx)++;
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = COMPLETE;
                 return self.state;
 
