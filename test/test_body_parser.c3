@@ -38,8 +38,7 @@ fn void test_chunk_delayed_lf() @test
         "4\r\n"
         "Wiki\r";
 
-    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
-    {
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state) {
         test::eq(*state, BodyParserState.EOF);
         test::eq(parser.state, BodyParserState.CHUNK_LF);
 
@@ -100,4 +99,25 @@ fn void test_multiple_body_chunks() @test
         buf.write(final_input)!!;
         test::eq(parser.step(buf, response)!!, BodyParserState.COMPLETE);
     };
+}
+
+//// Test for errors. ////
+
+// Test that extra bytes after the final double crlf doesn't result in an endless
+// loop.
+fn void test_bytes_after_double_crlf() @test
+{
+    String input =
+        "4\r\n"
+        "Wiki\r\n"
+        "0\r\n"
+        "\r\n"
+        "extra bytes";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
+        test::eq(*state, BodyParserState.COMPLETE);
+        test::@check(response.body.str_view().contains("Wiki"));
+    };
+
 }
