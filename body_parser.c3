@@ -74,14 +74,13 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
                 break;
 
             case HEX_CR:
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = HEX_LF;
-                (*read_idx)++;
                 break;
 
             case HEX_LF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = READ_CHUNK;
-                (*read_idx)++;
                 break;
 
             case READ_CHUNK:
@@ -99,27 +98,23 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
                 break;
 
             case CHUNK_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = CHUNK_LF;
-                (*read_idx)++;
                 break;
 
             case CHUNK_LF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = HEX_NUM;
-                (*read_idx)++;
                 break;
 
             case ZERO_HEX_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = ZERO_HEX_LF;
-                (*read_idx)++;
                 break;
 
             case ZERO_HEX_LF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = EXTENSION;
-                (*read_idx)++;
                 break;
 
             case EXTENSION:
@@ -127,9 +122,8 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
                 break;
 
             case DOUBLE_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
+                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = DOUBLE_LF;
-                (*read_idx)++;
                 break;
 
             case DOUBLE_LF:

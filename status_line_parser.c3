@@ -7,7 +7,7 @@ enum StatusLineState
     HTTP_VERSION,
     STATUS_CODE,
     STATUS_LINE_CR,
-    STATUS_LINE_CF,
+    STATUS_LINE_LF,
     REASON_SPACE,
     OPTIONAL_REASON,
     COMPLETE,
@@ -84,21 +84,19 @@ fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Respo
                 break;
 
             case STATUS_LINE_CR:
-                if (buf[*read_idx] != '\r') return MALFORMED_CRLF?;
-                self.state = STATUS_LINE_CF;
-                (*read_idx)++;
+                handle_cr(buf[*read_idx], read_idx)!;
+                self.state = STATUS_LINE_LF;
                 break;
 
-            case STATUS_LINE_CF:
-                if (buf[*read_idx] != '\n') return MALFORMED_CRLF?;
+            case STATUS_LINE_LF:
+                handle_lf(buf[*read_idx], read_idx)!;
                 self.state = COMPLETE;
-                (*read_idx)++;
                 return self.state;
 
             case REASON_SPACE:
                 if (buf[*read_idx] != ' ') return MALFORMED_STATUS_LINE?;
-                self.state = OPTIONAL_REASON;
                 (*read_idx)++;
+                self.state = OPTIONAL_REASON;
                 break;
 
             case OPTIONAL_REASON:
