@@ -7,6 +7,7 @@ import std::io;
 
   The caller passes the string input as an arg and the test assertions in the
   body.
+
 *>
 macro void? @status_line_test(String input; @test_asserts(Response response, StatusLineParser parser, StatusLineState state))
 {

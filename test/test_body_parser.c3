@@ -1,0 +1,123 @@
+module req;
+
+import std::io;
+
+macro void? @body_parser_test(String input; @test_asserts(io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state))
+{
+   BodyParser parser;
+   parser.init(tmem);
+
+   io::ByteBuffer buf;
+   buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+   buf.write(input)!;
+
+   Response response;
+   response.tinit();
+
+   BodyParserState state = parser.step(&buf, &response)!;
+   @test_asserts(&buf, &response, &parser, &state);
+}
+
+//// Test for RFC compliance. ////
+
+fn void test_chunk_body_hex_num() @test
+{
+    String input = "4\r\n";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
+        test::eq(*state, BodyParserState.EOF);
+        test::eq(parser.chunk_size_read, 4);
+        test::eq(parser.state, BodyParserState.READ_CHUNK);
+    };
+}
+
+fn void test_chunk_delayed_lf() @test
+{
+    String input =
+        "4\r\n"
+        "Wiki\r";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state) {
+        test::eq(*state, BodyParserState.EOF);
+        test::eq(parser.state, BodyParserState.CHUNK_LF);
+
+        String final_input = "\n";
+        buf.write(final_input)!!;
+        test::eq(parser.step(buf, response)!!, BodyParserState.EOF);
+
+        // The chunk should now be written in the response body.
+        test::@check(response.body.str_view().contains("Wiki"));
+
+        // The parser should now be ready for the next hex num.
+        test::eq(parser.state, BodyParserState.HEX_NUM);
+    };
+}
+
+fn void test_zero_hex_and_double_crlf() @test
+{
+    // We've read the 0 bytes, but we haven't received the double crlf yet.
+    String input =
+        "4\r\n"
+        "Wiki\r\n"
+        "0\r\n";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
+        test::eq(*state, BodyParserState.EOF);
+        test::eq(parser.state, BodyParserState.EXTENSION);
+
+        String final_input = "\r\n";
+        buf.write(final_input)!!;
+        test::eq(parser.step(buf, response)!!, BodyParserState.COMPLETE);
+    };
+}
+
+fn void test_multiple_body_chunks() @test
+{
+    // We've read the 0 bytes, but we haven't received the double crlf yet.
+    String input =
+        "4\r\n"
+        "Wiki\r\n"
+        "5\r\n"
+        "pedia\r\n"
+        "E\r\n"
+        " in\r\n"
+        "\r\n"
+        "chunks.\r\n";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
+        test::@check(response.body.str_view().contains("Wiki"));
+        test::@check(response.body.str_view().contains("pedia"));
+        test::@check(response.body.str_view().contains(" in\r\n\r\nchunks."));
+        test::eq(parser.state, BodyParserState.HEX_NUM);
+
+        String final_input =
+            "0\r\n"
+            "\r\n";
+        buf.write(final_input)!!;
+        test::eq(parser.step(buf, response)!!, BodyParserState.COMPLETE);
+    };
+}
+
+//// Test for errors. ////
+
+// Test that extra bytes after the final double crlf doesn't result in an endless
+// loop.
+fn void test_bytes_after_double_crlf() @test
+{
+    String input =
+        "4\r\n"
+        "Wiki\r\n"
+        "0\r\n"
+        "\r\n"
+        "extra bytes";
+
+    (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, BodyParserState* state)
+    {
+        test::eq(*state, BodyParserState.COMPLETE);
+        test::@check(response.body.str_view().contains("Wiki"));
+    };
+
+}
