@@ -3,8 +3,6 @@ module req;
 import std::collections::map;
 
 faultdef INVALID_PROTOCOL_VERSION,
-         MISSING_CRLF,
-         MALFORMED_HEADER,
          INVALID_HEADER_KEY_SYMBOL,
          MALFORMED_STATUS_LINE,
          INVALID_STATUS_CODE,

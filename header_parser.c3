@@ -67,7 +67,7 @@ fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* res
                 break;
 
             case HEADER_VALUE:
-                // If we have a LF out of place, it passes to the CR handler
+                // If we have a LF out of place, we jump to the CR handler
                 // to return the error.
                 if (buf[*read_idx] == '\n')
                 {
