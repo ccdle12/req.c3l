@@ -18,6 +18,11 @@ macro void? @header_parser_test(String input; @test_asserts(Response response, H
    @test_asserts(response, parser, state);
 }
 
+fn fault header_parser_error_test(String input)
+{
+    return @catch(@header_parser_test(input; Response response, HeaderParser parser, HeaderState state){});
+}
+
 //// Test for RFC compliance. ////
 
 fn void test_invalid_header_key_symbols() @test
@@ -36,14 +41,12 @@ fn void test_invalid_header_key_symbols() @test
 
     foreach (&header : invalid_headers)
     {
-        fault excuse = @catch(@header_parser_test(*header; Response response, HeaderParser parser, HeaderState state){});
-        test::eq(excuse, INVALID_HEADER_KEY_SYMBOL);
+        test::eq(header_parser_error_test(*header), INVALID_HEADER_KEY_SYMBOL);
     }
 }
 
 fn void test_invalid_whitespace_in_header() @test
 {
     String input = "Content-Type : \r\n";
-    fault excuse = @catch(@header_parser_test(input; Response response, HeaderParser parser, HeaderState state){});
-    test::eq(excuse, INVALID_TRAILING_SPACE);
+    test::eq(header_parser_error_test(input), INVALID_TRAILING_SPACE);
 }
