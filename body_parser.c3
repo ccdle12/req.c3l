@@ -34,10 +34,7 @@ fn void BodyParser.init(&self, Allocator allocator)
     self.chunk_size_cache.init(self.allocator);
 }
 
-fn void BodyParser.free(&self)
-{
-    self.chunk_size_cache.free();
-}
+fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
 fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)

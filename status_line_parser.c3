@@ -49,14 +49,14 @@ fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Respo
         switch(self.state)
         {
             case HTTP_VERSION:
-                // @step_until(target, innercode to execute)
                 if (buf[*read_idx] != ' ')
                 {
                     self.status_protocol_cache.append_char(buf[*read_idx]);
                 }
                 else
                 {
-                    response.parse_http_protocol(self.status_protocol_cache.str_view())!;
+                    String s = self.status_protocol_cache.str_view();
+                    response.parse_http_protocol(s)!;
                     self.state = STATUS_CODE;
                 }
 
@@ -70,10 +70,8 @@ fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Respo
                 }
                 else
                 {
-                    if (@catch(response.parse_status_code(self.status_code_cache.str_view())))
-                    {
-                        return INVALID_STATUS_CODE?;
-                    }
+                    String s = self.status_code_cache.str_view();
+                    if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
 
                     if (buf[*read_idx] == '\r') self.state = STATUS_LINE_CR;
                     if (buf[*read_idx] == ' ') self.state = REASON_SPACE;

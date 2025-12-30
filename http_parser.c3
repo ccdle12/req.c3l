@@ -28,7 +28,6 @@ struct Parser
     BodyParser body_parser;
 }
 
-
 fn void Parser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
@@ -64,12 +63,8 @@ fn ParserState? Parser.step(&self, char[] input)
         switch (self.state)
         {
             case STATUS_LINE:
-                if (self.status_line_parser.step(&self.buf, &self.response)! == COMPLETE)
-                {
-                    self.state = HEADER;
-                }
-                // TODO: THe same request mroe return?
-
+                StatusLineState result = self.status_line_parser.step(&self.buf, &self.response)!;
+                if (result == COMPLETE) self.state = HEADER;
                 break;
             case HEADER:
                 HeaderState result = self.header_parser.step(&self.buf, &self.response)!;
@@ -78,7 +73,7 @@ fn ParserState? Parser.step(&self, char[] input)
                     if (self.response.body_type == NULL)
                     {
                         self.state = COMPLETE;
-                        return COMPLETE;
+                        return self.state;
                     }
 
                     self.state = BODY;
@@ -89,14 +84,13 @@ fn ParserState? Parser.step(&self, char[] input)
 
                 break;
             case BODY:
-                // TODO: This is only a chunk body stepper.
                 BodyParserState result = self.body_parser.step(&self.buf, &self.response)!;
                 if (result == COMPLETE) return COMPLETE;
                 break;
             case COMPLETE:
                 return COMPLETE;
             default:
-                return REQUEST_MORE;
+                break;
         }
     }
 
