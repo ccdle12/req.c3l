@@ -25,6 +25,11 @@ macro void? @status_line_test(String input; @test_asserts(Response response, Sta
    @test_asserts(response, parser, state);
 }
 
+fn fault status_line_error_test(String input)
+{
+    return @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
+}
+
 //// Test for RFC compliance. ////
 
 // RFC9112: https://www.rfc-editor.org/rfc/rfc9112#section-4-1
@@ -59,9 +64,7 @@ fn void test_status_line_with_reason() @test
 fn void invalid_status_code_length() @test
 {
     String input = "HTTP/1.1 40001 OK\r\n";
-
-    fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
-    test::eq(excuse, INVALID_STATUS_CODE);
+    test::eq(status_line_error_test(input), INVALID_STATUS_CODE);
 }
 
 //// Test for errors. ////
@@ -69,9 +72,7 @@ fn void invalid_status_code_length() @test
 fn void test_incorrect_http_version() @test
 {
    String input = "HTTP/2.0 200\r\n";
-
-   fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
-   test::eq(excuse, INVALID_PROTOCOL_VERSION);
+   test::eq(status_line_error_test(input), INVALID_PROTOCOL_VERSION);
 }
 
 fn void test_missing_status_code() @test
@@ -104,7 +105,5 @@ fn void test_single_malformed_lf() @test
 fn void test_invalid_status_code() @test
 {
     String input = "HTTP/1.1 foo OK\r\n";
-
-    fault excuse = @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
-    test::eq(excuse, INVALID_STATUS_CODE);
+    test::eq(status_line_error_test(input), INVALID_STATUS_CODE);
 }
