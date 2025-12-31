@@ -15,7 +15,6 @@ enum BodyParserState
     EXTENSION,
     DOUBLE_CR,
     DOUBLE_LF,
-    EOF,
     COMPLETE,
 }
 
@@ -37,7 +36,7 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
     usz write_idx = byte_buf.write_idx;
@@ -129,12 +128,12 @@ fn BodyParserState? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* r
 
             case COMPLETE:
                 (*read_idx)++;
-                return self.state;
+                return COMPLETE;
 
             default:
-                return BodyParserState.EOF;
+                break;
         }
     }
 
-    return BodyParserState.EOF;
+    return REQUEST_MORE;
 }

@@ -9,7 +9,7 @@ import std::io;
   body.
 
 *>
-macro void? @status_line_test(String input; @test_asserts(Response response, StatusLineParser parser, StatusLineState state))
+macro void? @status_line_test(String input; @test_asserts(Response response, StatusLineParser parser, ParserResult result))
 {
    StatusLineParser parser;
    parser.init(tmem);
@@ -21,13 +21,15 @@ macro void? @status_line_test(String input; @test_asserts(Response response, Sta
    Response response;
    response.tinit();
 
-   StatusLineState state = parser.step(&buf, &response)!;
-   @test_asserts(response, parser, state);
+
+   //while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
+   ParserResult result = parser.step(&buf, &response)!;
+   @test_asserts(response, parser, result);
 }
 
 fn fault status_line_error_test(String input)
 {
-    return @catch(@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state){});
+    return @catch(@status_line_test(input; Response response, StatusLineParser parser, ParserResult result){});
 }
 
 //// Test for RFC compliance. ////
@@ -38,11 +40,11 @@ fn void test_basic_status_line_0() @test
 {
    String input = "HTTP/1.1 200\r\n";
 
-   (void)@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state)
+   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
    {
        test::eq(response.http_version, "HTTP/1.1");
        test::eq(response.status_code, 200);
-       test::eq(parser.state, StatusLineState.COMPLETE);
+       test::eq(result, ParserResult.COMPLETE);
    };
 }
 
@@ -51,7 +53,7 @@ fn void test_status_line_with_reason() @test
 {
    String input = "HTTP/1.1 200 OK\r\n";
 
-   (void)@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state)
+   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
    {
        test::eq(response.http_version, "HTTP/1.1");
        test::eq(response.status_code, 200);
@@ -78,27 +80,27 @@ fn void test_incorrect_http_version() @test
 fn void test_missing_status_code() @test
 {
    String input = "HTTP/1.0\r\n";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state)
+   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
    {
-       test::eq(state, StatusLineState.EOF);
+       test::eq(result, ParserResult.REQUEST_MORE);
    };
 }
 
 fn void test_empty_input() @test
 {
    String input = "";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state)
+   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
    {
-       test::eq(state, StatusLineState.EOF);
+       test::eq(result, ParserResult.REQUEST_MORE);
    };
 }
 
 fn void test_single_malformed_lf() @test
 {
    String input = "\n";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, StatusLineState state)
+   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
    {
-       test::eq(state, StatusLineState.EOF);
+       test::eq(result, ParserResult.REQUEST_MORE);
    };
 }
 

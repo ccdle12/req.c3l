@@ -2,7 +2,7 @@ module req;
 
 import std::io;
 
-macro void? @header_parser_test(String input; @test_asserts(Response response, HeaderParser parser, HeaderState state))
+macro void? @header_parser_test(String input; @test_asserts(Response response, HeaderParser parser, ParserResult result))
 {
    HeaderParser parser;
    parser.init(tmem);
@@ -14,13 +14,13 @@ macro void? @header_parser_test(String input; @test_asserts(Response response, H
    Response response;
    response.tinit();
 
-   HeaderState state = parser.step(&buf, &response)!;
-   @test_asserts(response, parser, state);
+   ParserResult result = parser.step(&buf, &response)!;
+   @test_asserts(response, parser, result);
 }
 
 fn fault header_parser_error_test(String input)
 {
-    return @catch(@header_parser_test(input; Response response, HeaderParser parser, HeaderState state){});
+    return @catch(@header_parser_test(input; Response response, HeaderParser parser, ParserResult result){});
 }
 
 //// Test for RFC compliance. ////
