@@ -10,7 +10,6 @@ enum HeaderState
     HEADER_LF,
     DOUBLE_CR,
     DOUBLE_LF,
-    EOF,
     COMPLETE,
 }
 
@@ -38,7 +37,7 @@ fn void HeaderParser.free(&self)
    self.tmp_header_val.free();
 }
 
-fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
     usz write_idx = byte_buf.write_idx;
@@ -113,12 +112,12 @@ fn HeaderState? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* res
             case DOUBLE_LF:
                 handle_lf(buf[*read_idx], read_idx)!;
                 self.state = COMPLETE;
-                return self.state;
+                return COMPLETE;
 
             default:
                 break;
         }
     }
 
-    return EOF;
+    return REQUEST_MORE;
 }

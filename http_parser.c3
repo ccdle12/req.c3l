@@ -14,7 +14,12 @@ enum ParserState
     HEADER,
     BODY,
     COMPLETE,
+}
+
+enum ParserResult
+{
     REQUEST_MORE,
+    COMPLETE,
 }
 
 struct Parser
@@ -53,7 +58,7 @@ fn void Parser.free(&self)
    self.body_parser.free();
 }
 
-fn ParserState? Parser.step(&self, char[] input)
+fn ParserResult? Parser.step(&self, char[] input)
 {
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
@@ -63,28 +68,27 @@ fn ParserState? Parser.step(&self, char[] input)
         switch (self.state)
         {
             case STATUS_LINE:
-                StatusLineState result = self.status_line_parser.step(&self.buf, &self.response)!;
+                ParserResult result = self.status_line_parser.step(&self.buf, &self.response)!;
                 if (result == COMPLETE) self.state = HEADER;
                 break;
             case HEADER:
-                HeaderState result = self.header_parser.step(&self.buf, &self.response)!;
+                ParserResult result = self.header_parser.step(&self.buf, &self.response)!;
                 if (result == COMPLETE)
                 {
+                    self.state = BODY;
+
                     if (self.response.body_type == NULL)
                     {
                         self.state = COMPLETE;
-                        return self.state;
+                        return COMPLETE;
                     }
 
-                    self.state = BODY;
                     break;
                 }
 
-                if (result == EOF) return REQUEST_MORE;
-
                 break;
             case BODY:
-                BodyParserState result = self.body_parser.step(&self.buf, &self.response)!;
+                ParserResult result = self.body_parser.step(&self.buf, &self.response)!;
                 if (result == COMPLETE) return COMPLETE;
                 break;
             case COMPLETE:

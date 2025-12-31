@@ -11,7 +11,6 @@ enum StatusLineState
     REASON_SPACE,
     OPTIONAL_REASON,
     COMPLETE,
-    EOF,
 }
 
 struct StatusLineParser
@@ -38,7 +37,7 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
     usz write_idx = byte_buf.write_idx;
@@ -89,7 +88,7 @@ fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Respo
             case STATUS_LINE_LF:
                 handle_lf(buf[*read_idx], read_idx)!;
                 self.state = COMPLETE;
-                return self.state;
+                return COMPLETE;
 
             case REASON_SPACE:
                 if (buf[*read_idx] != ' ') return MALFORMED_STATUS_LINE?;
@@ -115,8 +114,8 @@ fn StatusLineState? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Respo
 
             default:
                 break;
-        }
+       }
     }
 
-    return EOF;
+    return REQUEST_MORE;
 }
