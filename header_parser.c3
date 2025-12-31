@@ -43,8 +43,6 @@ fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* re
     usz write_idx = byte_buf.write_idx;
     char[] buf = byte_buf.bytes;
 
-    while (*read_idx < write_idx)
-    {
         switch(self.state)
         {
             case HEADER_KEY:
@@ -117,7 +115,6 @@ fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* re
             default:
                 break;
         }
-    }
 
     return REQUEST_MORE;
 }

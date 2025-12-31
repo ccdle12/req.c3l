@@ -4,18 +4,19 @@ import std::io;
 
 macro void? @body_parser_test(String input; @test_asserts(io::ByteBuffer* buf, Response* response, BodyParser* parser, ParserResult* result))
 {
-   BodyParser parser;
-   parser.init(tmem);
+    BodyParser parser;
+    parser.init(tmem);
 
-   io::ByteBuffer buf;
-   buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-   buf.write(input)!;
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
 
-   Response response;
-   response.tinit();
+    Response response;
+    response.tinit();
 
-   ParserResult result = parser.step(&buf, &response)!;
-   @test_asserts(&buf, &response, &parser, &result);
+    ParserResult result;
+    while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
+    @test_asserts(&buf, &response, &parser, &result);
 }
 
 //// Test for RFC compliance. ////
@@ -70,7 +71,8 @@ fn void test_zero_hex_and_double_crlf() @test
 
         String final_input = "\r\n";
         buf.write(final_input)!!;
-        test::eq(parser.step(buf, response)!!, ParserResult.COMPLETE);
+        while (buf.read_idx < buf.write_idx) parser.step(buf, response)!!;
+        test::eq(parser.state, BodyParserState.COMPLETE);
     };
 }
 
@@ -98,7 +100,9 @@ fn void test_multiple_body_chunks() @test
             "0\r\n"
             "\r\n";
         buf.write(final_input)!!;
-        test::eq(parser.step(buf, response)!!, ParserResult.COMPLETE);
+
+        while (buf.read_idx < buf.write_idx) parser.step(buf, response)!!;
+        test::eq(parser.state, BodyParserState.COMPLETE);
     };
 }
 

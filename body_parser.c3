@@ -42,8 +42,6 @@ fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* resp
     usz write_idx = byte_buf.write_idx;
     char[] buf = byte_buf.bytes;
 
-    while (*read_idx < write_idx)
-    {
         switch(self.state)
         {
             case HEX_NUM:
@@ -58,8 +56,10 @@ fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* resp
                 self.chunk_size_read = chunk_size;
                 self.chunk_size_cache.clear();
 
+                io::printfn("before: chunk size read: %d", self.chunk_size_read);
                 if (self.chunk_size_read == 0)
                 {
+                    io::printfn("setting zero hex cr");
                     self.state = ZERO_HEX_CR;
                 }
                 else
@@ -104,11 +104,13 @@ fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* resp
                 break;
 
             case ZERO_HEX_CR:
+                io::printfn("in zero hex cr");
                 handle_cr(buf[*read_idx], read_idx)!;
                 self.state = ZERO_HEX_LF;
                 break;
 
             case ZERO_HEX_LF:
+                io::printfn("in zero hex lf");
                 handle_lf(buf[*read_idx], read_idx)!;
                 self.state = EXTENSION;
                 break;
@@ -118,6 +120,7 @@ fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* resp
                 break;
 
             case DOUBLE_CR:
+                io::printfn("in double cr");
                 handle_cr(buf[*read_idx], read_idx)!;
                 self.state = DOUBLE_LF;
                 break;
@@ -133,7 +136,7 @@ fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* resp
             default:
                 break;
         }
-    }
 
+    io::printfn("return request mroe");
     return REQUEST_MORE;
 }

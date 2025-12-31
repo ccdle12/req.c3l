@@ -43,8 +43,6 @@ fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response
     usz write_idx = byte_buf.write_idx;
     char[] buf = byte_buf.bytes;
 
-    while (*read_idx < write_idx)
-    {
         switch(self.state)
         {
             case HTTP_VERSION:
@@ -114,7 +112,6 @@ fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response
 
             default:
                 break;
-       }
     }
 
     return REQUEST_MORE;

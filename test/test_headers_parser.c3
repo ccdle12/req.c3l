@@ -4,18 +4,19 @@ import std::io;
 
 macro void? @header_parser_test(String input; @test_asserts(Response response, HeaderParser parser, ParserResult result))
 {
-   HeaderParser parser;
-   parser.init(tmem);
+    HeaderParser parser;
+    parser.init(tmem);
 
-   io::ByteBuffer buf;
-   buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-   buf.write(input)!;
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
 
-   Response response;
-   response.tinit();
+    Response response;
+    response.tinit();
 
-   ParserResult result = parser.step(&buf, &response)!;
-   @test_asserts(response, parser, result);
+    ParserResult result;
+    while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
+    @test_asserts(response, parser, result);
 }
 
 fn fault header_parser_error_test(String input)
