@@ -15,9 +15,8 @@ macro void? @body_parser_test(String input; @test_asserts(io::ByteBuffer* buf, R
     response.tinit();
 
     ParserResult result;
-    while (buf.read_idx < buf.write_idx)
+    while (try current = buf.read_byte())
     {
-        char current = buf.read_byte()!;
         result = parser.step(current, &response)!;
     }
     @test_asserts(&buf, &response, &parser, &result);
@@ -52,9 +51,8 @@ fn void test_chunk_delayed_lf() @test
         buf.write(final_input)!!;
 
         ParserResult result_1;
-        while (buf.read_idx < buf.write_idx)
+        while (try current = buf.read_byte())
         {
-            char current = buf.read_byte()!!;
             result_1 = parser.step(current, response)!!;
         }
         test::eq(result_1, ParserResult.REQUEST_MORE);

@@ -6,9 +6,7 @@ enum StatusLineState
 {
     HTTP_VERSION,
     STATUS_CODE,
-    STATUS_LINE_CR,
     STATUS_LINE_LF,
-    REASON_SPACE,
     OPTIONAL_REASON,
     COMPLETE,
 }
@@ -39,73 +37,55 @@ fn void StatusLineParser.free(&self)
 
 fn ParserResult? StatusLineParser.step(&self, char current, Response* response)
 {
-        switch(self.state)
-        {
-            case HTTP_VERSION:
-                if (current != ' ')
-                {
-                    self.status_protocol_cache.append_char(current);
-                }
-                else
-                {
-                    String s = self.status_protocol_cache.str_view();
-                    response.parse_http_protocol(s)!;
-                    self.state = STATUS_CODE;
-                }
+    switch(self.state)
+    {
+        case HTTP_VERSION:
+            if (current == SP)
+            {
+                String s = self.status_protocol_cache.str_view();
+                defer self.status_protocol_cache.clear();
+                response.parse_http_protocol(s)!;
 
+                self.state = STATUS_CODE;
                 break;
+            }
 
-            case STATUS_CODE:
-                if (current != '\r' && current != ' ')
-                {
-                    self.status_code_cache.append_char(current);
-                }
-                else
-                {
-                    String s = self.status_code_cache.str_view();
-                    if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
+            self.status_protocol_cache.append_char(current);
+            break;
 
-                    // TODO: NEED TO SHIFT EVERYTHING because of the current byte being replaced next.
-                    if (current == '\r') self.state = STATUS_LINE_LF;
-                    if (current == ' ') self.state = OPTIONAL_REASON;
-                    break;
-                }
+        case STATUS_CODE:
+            if (current == CR || current == SP)
+            {
+                String s = self.status_code_cache.str_view();
+                defer self.status_code_cache.clear();
+                if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
 
+                if (current == CR) self.state = STATUS_LINE_LF;
+                if (current == SP) self.state = OPTIONAL_REASON;
                 break;
+            }
 
-            case STATUS_LINE_CR:
+            self.status_code_cache.append_char(current);
+            break;
+
+        case STATUS_LINE_LF:
+            assert_lf(current)!;
+            self.state = COMPLETE;
+            return COMPLETE;
+
+        case OPTIONAL_REASON:
+            if (current == CR || current == SP)
+            {
+                response.reason_phrase = self.status_line_reason.str_view();
                 self.state = STATUS_LINE_LF;
                 break;
+            }
 
-            case STATUS_LINE_LF:
-                if (current != '\n') return MALFORMED_CRLF?;
-                io::printfn("setting state as complete and returning complete");
-                self.state = COMPLETE;
-                return COMPLETE;
+            self.status_line_reason.append_char(current);
+            break;
 
-            case REASON_SPACE:
-                io::printfn("reason space");
-                self.state = OPTIONAL_REASON;
-                break;
-
-            case OPTIONAL_REASON:
-                if (current != '\r' && current != ' ')
-                {
-                    self.status_line_reason.append_char(current);
-                }
-                else
-                {
-                    // TODO: Need to set a max length of this reason phrase?
-                    response.reason_phrase = self.status_line_reason.str_view();
-                    io::printfn("before status line cr");
-                    self.state = STATUS_LINE_LF;
-                    break;
-                }
-
-                break;
-
-            default:
-                break;
+        default:
+            break;
     }
 
     return REQUEST_MORE;

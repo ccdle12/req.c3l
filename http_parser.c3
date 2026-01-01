@@ -63,19 +63,21 @@ fn ParserResult? Parser.step(&self, char[] input)
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
 
-    while (self.buf.read_idx < self.buf.write_idx)
+    while (try current = self.buf.read_byte())
     {
-        char current = self.buf.read_byte()!;
-
         switch (self.state)
         {
             case STATUS_LINE:
-                ParserResult result = self.status_line_parser.step(current, &self.response)!;
-                if (result == COMPLETE) self.state = HEADER;
+                ParserResult status_line = self.status_line_parser.step(current, &self.response)!;
+                if (status_line == COMPLETE)
+                {
+                    self.state = HEADER;
+                }
                 break;
+
             case HEADER:
-                ParserResult result = self.header_parser.step(current, &self.response)!;
-                if (result == COMPLETE)
+                ParserResult header = self.header_parser.step(current, &self.response)!;
+                if (header == COMPLETE)
                 {
                     self.state = BODY;
 
@@ -84,18 +86,18 @@ fn ParserResult? Parser.step(&self, char[] input)
                         self.state = COMPLETE;
                         return COMPLETE;
                     }
-
-                    break;
                 }
 
                 break;
+
             case BODY:
-                //ParserResult result = self.body_parser.step(&self.buf, &self.response)!;
-                ParserResult result = self.body_parser.step(current, &self.response)!;
-                if (result == COMPLETE) return COMPLETE;
+                ParserResult body = self.body_parser.step(current, &self.response)!;
+                if (body == COMPLETE) return COMPLETE;
                 break;
+
             case COMPLETE:
                 return COMPLETE;
+
             default:
                 break;
         }

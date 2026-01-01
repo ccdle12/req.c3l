@@ -2,6 +2,10 @@ module req;
 
 import std::core::ascii;
 
+const char CR = '\r';
+const char LF = '\n';
+const char SP = ' ';
+
 <*
   Checks for valid characters allowed for HTTP Header keys.
 *>
@@ -30,23 +34,18 @@ fn bool is_tchar(char c)
     return false;
 }
 
-// TODO: Maybe remvoe all of this or make it just return error.
 <*
   Common function to handle a CR when stepping in the parsers.
 *>
-fn void? handle_cr(char c, usz* read_idx) => handle_crlf('\r', c, read_idx)!;
+fn void? assert_cr(char c)
+{
+    if (c != CR) return MALFORMED_CRLF?;
+}
 
 <*
   Common function to handle an LF when stepping in the parsers.
 *>
-fn void? handle_lf(char c, usz* read_idx) => handle_crlf('\n', c, read_idx)!;
-
-<*
-  Internal function for both cr and lf.
-*>
-fn void? handle_crlf(char target, char c, usz* read_idx) @private
+fn void? assert_lf(char c)
 {
-    if (c != target) return MALFORMED_CRLF?;
-    (*read_idx)++;
-    return;
+    if (c != LF) return MALFORMED_CRLF?;
 }

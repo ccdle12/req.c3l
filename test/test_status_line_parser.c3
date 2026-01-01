@@ -22,9 +22,8 @@ macro void? @status_line_test(String input; @test_asserts(Response response, Sta
     response.tinit();
 
     ParserResult result;
-    while (buf.read_idx < buf.write_idx)
+    while (try current = buf.read_byte())
     {
-        char current = buf.read_byte()!;
         result = parser.step(current, &response)!;
     }
     @test_asserts(response, parser, result);
