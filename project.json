@@ -5,7 +5,7 @@
   "dependencies": [ "tora" ],
   "authors": [ "" ],
   "version": "0.1.0",
-  "sources": [ "*", "src/*", "test/*" ],
+  "sources": [ "*", "src/http1/*", "test/http1/*" ],
   "output": "build",
   "targets": {
     "req": {
