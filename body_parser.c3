@@ -22,7 +22,7 @@ struct BodyParser
 {
     Allocator allocator;
     BodyParserState state;
-    ulong chunk_size_read;
+    ulong chunk_size;
     DString chunk_size_cache;
 }
 
@@ -38,105 +38,105 @@ fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
 fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
+    // TODO: Delete *read_idx once I update handle_cr and handle_lf to call read_byte?
+    //  TODO: Maybe can even call read_byte() from the http_parser and just pass a copy of the char.
     usz *read_idx = &byte_buf.read_idx;
-    usz write_idx = byte_buf.write_idx;
-    char[] buf = byte_buf.bytes;
+    char current = byte_buf.read_byte()!;
 
-        switch(self.state)
-        {
-            case HEX_NUM:
-                if (buf[*read_idx] != '\r')
-                {
-                    self.chunk_size_cache.append_char(buf[*read_idx]);
-                    (*read_idx)++;
-                    break;
-                }
-
-                ulong chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
-                self.chunk_size_read = chunk_size;
-                self.chunk_size_cache.clear();
-
-                io::printfn("before: chunk size read: %d", self.chunk_size_read);
-                if (self.chunk_size_read == 0)
-                {
-                    io::printfn("setting zero hex cr");
-                    self.state = ZERO_HEX_CR;
-                }
-                else
-                {
-                    self.state = HEX_CR;
-                }
-
+    switch(self.state)
+    {
+        case HEX_NUM:
+            if (current != '\r')
+            {
+                self.chunk_size_cache.append_char(current);
                 break;
+            }
 
-            case HEX_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = HEX_LF;
-                break;
+            self.chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
+            self.chunk_size_cache.clear();
 
-            case HEX_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = READ_CHUNK;
-                break;
+            if (self.chunk_size == 0)
+            {
+                self.state = ZERO_HEX_CR;
+            }
+            else
+            {
+                self.state = HEX_CR;
+            }
 
-            case READ_CHUNK:
-                if (self.chunk_size_read > 0)
-                {
-                    response.body.append_char(buf[*read_idx]);
-                    self.chunk_size_read--;
-                    (*read_idx)++;
-                }
-                else
-                {
-                    self.state = CHUNK_CR;
-                }
+            break;
 
-                break;
+        case HEX_CR:
+            // Update this to just do byte_buf.read_byte()!;
+            //handle_cr(current, read_idx)!;
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = HEX_LF;
+            break;
 
-            case CHUNK_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = CHUNK_LF;
-                break;
+        case HEX_LF:
+            //handle_lf(current, read_idx)!;
+            if (current != '\n') return MALFORMED_CRLF?;
+            self.state = READ_CHUNK;
+            break;
 
-            case CHUNK_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = HEX_NUM;
-                break;
+        case READ_CHUNK:
+            if (self.chunk_size > 0)
+            {
+                response.body.append_char(current);
+                self.chunk_size--;
+                //current = byte_buf.read_byte()!;
+            }
+            else
+            {
+                self.state = CHUNK_CR;
+            }
 
-            case ZERO_HEX_CR:
-                io::printfn("in zero hex cr");
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = ZERO_HEX_LF;
-                break;
+            break;
 
-            case ZERO_HEX_LF:
-                io::printfn("in zero hex lf");
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = EXTENSION;
-                break;
+        case CHUNK_CR:
+            //handle_cr(current, read_idx)!;
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = CHUNK_LF;
+            break;
 
-            case EXTENSION:
-                if (buf[*read_idx] == '\r') self.state = DOUBLE_CR;
-                break;
+        case CHUNK_LF:
+            //handle_lf(current, read_idx)!;
+            if (current != '\n') return MALFORMED_CRLF?;
+            self.state = HEX_NUM;
+            break;
 
-            case DOUBLE_CR:
-                io::printfn("in double cr");
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = DOUBLE_LF;
-                break;
+        case ZERO_HEX_CR:
+            //handle_cr(current, read_idx)!;
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = ZERO_HEX_LF;
+            break;
 
-            case DOUBLE_LF:
-                if (buf[*read_idx] == '\n') self.state = COMPLETE;
-                break;
+        case ZERO_HEX_LF:
+            //handle_lf(current, read_idx)!;
+            if (current != '\n') return MALFORMED_CRLF?;
+            self.state = EXTENSION;
+            break;
 
-            case COMPLETE:
-                (*read_idx)++;
-                return COMPLETE;
+        case EXTENSION:
+            if (current == '\r') self.state = DOUBLE_CR;
+            break;
 
-            default:
-                break;
-        }
+        case DOUBLE_CR:
+            //handle_cr(current, read_idx)!;
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = DOUBLE_LF;
+            break;
 
-    io::printfn("return request mroe");
+        case DOUBLE_LF:
+            if (current == '\n') self.state = COMPLETE;
+            break;
+
+        case COMPLETE:
+            return COMPLETE;
+
+        default:
+            break;
+    }
+
     return REQUEST_MORE;
 }

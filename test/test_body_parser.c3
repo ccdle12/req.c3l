@@ -28,7 +28,7 @@ fn void test_chunk_body_hex_num() @test
     (void)@body_parser_test(input; io::ByteBuffer* buf, Response* response, BodyParser* parser, ParserResult* result)
     {
         test::eq(*result, ParserResult.REQUEST_MORE);
-        test::eq(parser.chunk_size_read, 4);
+        test::eq(parser.chunk_size, 4);
         test::eq(parser.state, BodyParserState.READ_CHUNK);
     };
 }

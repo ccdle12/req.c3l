@@ -40,42 +40,41 @@ fn void HeaderParser.free(&self)
 fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
-    usz write_idx = byte_buf.write_idx;
-    char[] buf = byte_buf.bytes;
+    char current = byte_buf.bytes[*read_idx];
 
         switch(self.state)
         {
             case HEADER_KEY:
-                if (buf[*read_idx] == '\r')
+                if (current == '\r')
                 {
                     self.state = DOUBLE_CR;
                     break;
                 }
 
-                if (buf[*read_idx] == ':')
+                if (current == ':')
                 {
                     self.state = HEADER_VALUE;
-                    (*read_idx)++;
+                    current = byte_buf.read_byte()!;
                     break;
                 }
 
-                self.tmp_header_key.append_char(buf[*read_idx]);
-                (*read_idx)++;
+                self.tmp_header_key.append_char(current);
+                current = byte_buf.read_byte()!;
                 break;
 
             case HEADER_VALUE:
                 // If we have a LF out of place, we jump to the CR handler
                 // to return the error.
-                if (buf[*read_idx] == '\n')
+                if (current == '\n')
                 {
                     self.state = HEADER_CR;
                     break;
                 }
 
-                if (buf[*read_idx] != '\r')
+                if (current != '\r')
                 {
-                    self.tmp_header_val.append_char(buf[*read_idx]);
-                    (*read_idx)++;
+                    self.tmp_header_val.append_char(current);
+                    current = byte_buf.read_byte()!;
                     break;
                 }
 
@@ -93,22 +92,30 @@ fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* re
                 break;
 
             case HEADER_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
+                //handle_cr(buf[*read_idx], read_idx)!;
+                if (current != '\r') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = HEADER_LF;
                 break;
 
             case HEADER_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
+                //handle_lf(buf[*read_idx], read_idx)!;
+                if (current != '\n') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = HEADER_KEY;
                 break;
 
             case DOUBLE_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
+                //handle_cr(buf[*read_idx], read_idx)!;
+                if (current != '\r') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = DOUBLE_LF;
                 break;
 
             case DOUBLE_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
+                //handle_lf(buf[*read_idx], read_idx)!;
+                if (current != '\n') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = COMPLETE;
                 return COMPLETE;
 

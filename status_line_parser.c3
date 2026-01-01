@@ -40,15 +40,14 @@ fn void StatusLineParser.free(&self)
 fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
 {
     usz *read_idx = &byte_buf.read_idx;
-    usz write_idx = byte_buf.write_idx;
-    char[] buf = byte_buf.bytes;
+    char current = byte_buf.bytes[*read_idx];
 
         switch(self.state)
         {
             case HTTP_VERSION:
-                if (buf[*read_idx] != ' ')
+                if (current != ' ')
                 {
-                    self.status_protocol_cache.append_char(buf[*read_idx]);
+                    self.status_protocol_cache.append_char(current);
                 }
                 else
                 {
@@ -57,47 +56,51 @@ fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response
                     self.state = STATUS_CODE;
                 }
 
-                (*read_idx)++;
+                current = byte_buf.read_byte()!;
                 break;
 
             case STATUS_CODE:
-                if (buf[*read_idx] != '\r' && buf[*read_idx] != ' ')
+                if (current != '\r' && current != ' ')
                 {
-                    self.status_code_cache.append_char(buf[*read_idx]);
+                    self.status_code_cache.append_char(current);
                 }
                 else
                 {
                     String s = self.status_code_cache.str_view();
                     if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
 
-                    if (buf[*read_idx] == '\r') self.state = STATUS_LINE_CR;
-                    if (buf[*read_idx] == ' ') self.state = REASON_SPACE;
+                    if (current == '\r') self.state = STATUS_LINE_CR;
+                    if (current == ' ') self.state = REASON_SPACE;
                     break;
                 }
 
-                (*read_idx)++;
+                current = byte_buf.read_byte()!;
                 break;
 
             case STATUS_LINE_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
+                if (current != '\r') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = STATUS_LINE_LF;
                 break;
 
             case STATUS_LINE_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
+                //handle_lf(current, read_idx)!;
+                if (current != '\n') return MALFORMED_CRLF?;
+                current = byte_buf.read_byte()!;
                 self.state = COMPLETE;
                 return COMPLETE;
 
             case REASON_SPACE:
-                if (buf[*read_idx] != ' ') return MALFORMED_STATUS_LINE?;
-                (*read_idx)++;
+                if (current != ' ') return MALFORMED_STATUS_LINE?;
+                //(*read_idx)++;
+                current = byte_buf.read_byte()!;
                 self.state = OPTIONAL_REASON;
                 break;
 
             case OPTIONAL_REASON:
-                if (buf[*read_idx] != '\r' && buf[*read_idx] != ' ')
+                if (current != '\r' && current != ' ')
                 {
-                    self.status_line_reason.append_char(buf[*read_idx]);
+                    self.status_line_reason.append_char(current);
                 }
                 else
                 {
@@ -107,7 +110,7 @@ fn ParserResult? StatusLineParser.step(&self, io::ByteBuffer* byte_buf, Response
                     break;
                 }
 
-                (*read_idx)++;
+                current = byte_buf.read_byte()!;
                 break;
 
             default:

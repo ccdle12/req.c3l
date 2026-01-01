@@ -30,6 +30,7 @@ fn bool is_tchar(char c)
     return false;
 }
 
+// TODO: Maybe remvoe all of this or make it just return error.
 <*
   Common function to handle a CR when stepping in the parsers.
 *>
