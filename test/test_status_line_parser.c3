@@ -11,20 +11,22 @@ import std::io;
 *>
 macro void? @status_line_test(String input; @test_asserts(Response response, StatusLineParser parser, ParserResult result))
 {
-   StatusLineParser parser;
-   parser.init(tmem);
+    StatusLineParser parser;
+    parser.init(tmem);
 
-   io::ByteBuffer buf;
-   buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-   buf.write(input)!;
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
 
-   Response response;
-   response.tinit();
+    Response response;
+    response.tinit();
 
-
-   //while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
-   ParserResult result = parser.step(&buf, &response)!;
-   @test_asserts(response, parser, result);
+    ParserResult result;
+    while (try current = buf.read_byte())
+    {
+        result = parser.step(current, &response)!;
+    }
+    @test_asserts(response, parser, result);
 }
 
 fn fault status_line_error_test(String input)

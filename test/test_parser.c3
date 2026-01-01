@@ -178,7 +178,7 @@ fn void test_incremental_read() @test
         test::@check(parser.buf_str_view().contains(input_2));
 
         String input_3 =
-          "\r\n\r\n";
+         "\r\n\r\n";
 
         test::eq(parser.step(input_3)!!, ParserResult.REQUEST_MORE);
         test::eq(parser.state, ParserState.BODY);

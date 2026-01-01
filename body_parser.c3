@@ -22,7 +22,7 @@ struct BodyParser
 {
     Allocator allocator;
     BodyParserState state;
-    ulong chunk_size_read;
+    ulong chunk_size;
     DString chunk_size_cache;
 }
 
@@ -36,103 +36,86 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? BodyParser.step(&self, char current, Response* response)
 {
-    usz *read_idx = &byte_buf.read_idx;
-    usz write_idx = byte_buf.write_idx;
-    char[] buf = byte_buf.bytes;
-
-    while (*read_idx < write_idx)
+    switch(self.state)
     {
-        switch(self.state)
-        {
-            case HEX_NUM:
-                if (buf[*read_idx] != '\r')
+        case HEX_NUM:
+            if (current == CR)
+            {
+                self.chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
+                self.chunk_size_cache.clear();
+
+                if (self.chunk_size == 0)
                 {
-                    self.chunk_size_cache.append_char(buf[*read_idx]);
-                    (*read_idx)++;
+                    self.state = ZERO_HEX_CR;
                     break;
                 }
 
-                ulong chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
-                self.chunk_size_read = chunk_size;
-                self.chunk_size_cache.clear();
-
-                if (self.chunk_size_read == 0)
-                {
-                    self.state = ZERO_HEX_CR;
-                }
-                else
-                {
-                    self.state = HEX_CR;
-                }
+                self.state = HEX_CR;
 
                 break;
+            }
 
-            case HEX_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = HEX_LF;
+            self.chunk_size_cache.append_char(current);
+            break;
+
+        case HEX_CR:
+            if (current != CR) return MALFORMED_CRLF?;
+            self.state = HEX_LF;
+            break;
+
+        case HEX_LF:
+            if (current != LF) return MALFORMED_CRLF?;
+            self.state = READ_CHUNK;
+            break;
+
+        case READ_CHUNK:
+            if (self.chunk_size > 0)
+            {
+                response.body.append_char(current);
+                self.chunk_size--;
                 break;
+            }
 
-            case HEX_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = READ_CHUNK;
-                break;
+            self.state = CHUNK_CR;
+            break;
 
-            case READ_CHUNK:
-                if (self.chunk_size_read > 0)
-                {
-                    response.body.append_char(buf[*read_idx]);
-                    self.chunk_size_read--;
-                    (*read_idx)++;
-                }
-                else
-                {
-                    self.state = CHUNK_CR;
-                }
+        case CHUNK_CR:
+            assert_cr(current)!;
+            self.state = CHUNK_LF;
+            break;
 
-                break;
+        case CHUNK_LF:
+            assert_lf(current)!;
+            self.state = HEX_NUM;
+            break;
 
-            case CHUNK_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = CHUNK_LF;
-                break;
+        case ZERO_HEX_CR:
+            assert_cr(current)!;
+            self.state = ZERO_HEX_LF;
+            break;
 
-            case CHUNK_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = HEX_NUM;
-                break;
+        case ZERO_HEX_LF:
+            assert_lf(current)!;
+            self.state = EXTENSION;
+            break;
 
-            case ZERO_HEX_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = ZERO_HEX_LF;
-                break;
+        case EXTENSION:
+            assert_cr(current)!;
+            break;
 
-            case ZERO_HEX_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = EXTENSION;
-                break;
+        case DOUBLE_CR:
+            assert_cr(current)!;
+            self.state = DOUBLE_LF;
+            break;
 
-            case EXTENSION:
-                if (buf[*read_idx] == '\r') self.state = DOUBLE_CR;
-                break;
+        case DOUBLE_LF:
+            if (current == LF) self.state = COMPLETE;
+            break;
 
-            case DOUBLE_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = DOUBLE_LF;
-                break;
-
-            case DOUBLE_LF:
-                if (buf[*read_idx] == '\n') self.state = COMPLETE;
-                break;
-
-            case COMPLETE:
-                (*read_idx)++;
-                return COMPLETE;
-
-            default:
-                break;
-        }
+        default:
+            break;
     }
 
     return REQUEST_MORE;

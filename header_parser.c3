@@ -6,7 +6,6 @@ enum HeaderState
 {
     HEADER_KEY,
     HEADER_VALUE,
-    HEADER_CR,
     HEADER_LF,
     DOUBLE_CR,
     DOUBLE_LF,
@@ -18,8 +17,8 @@ struct HeaderParser
     Allocator allocator;
     HeaderState state;
 
-    DString tmp_header_key;
-    DString tmp_header_val;
+    DString header_key_cache;
+    DString header_val_cache;
 }
 
 fn void HeaderParser.init(&self, Allocator allocator)
@@ -27,96 +26,74 @@ fn void HeaderParser.init(&self, Allocator allocator)
     self.allocator = allocator;
     self.state = HEADER_KEY;
 
-    self.tmp_header_key.init(self.allocator);
-    self.tmp_header_val.init(self.allocator);
+    self.header_key_cache.init(self.allocator);
+    self.header_val_cache.init(self.allocator);
 }
 
 fn void HeaderParser.free(&self)
 {
-   self.tmp_header_key.free();
-   self.tmp_header_val.free();
+   self.header_key_cache.free();
+   self.header_val_cache.free();
 }
 
-fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? HeaderParser.step(&self, char current, Response* response)
 {
-    usz *read_idx = &byte_buf.read_idx;
-    usz write_idx = byte_buf.write_idx;
-    char[] buf = byte_buf.bytes;
-
-    while (*read_idx < write_idx)
+    switch(self.state)
     {
-        switch(self.state)
-        {
-            case HEADER_KEY:
-                if (buf[*read_idx] == '\r')
-                {
-                    self.state = DOUBLE_CR;
-                    break;
-                }
-
-                if (buf[*read_idx] == ':')
-                {
-                    self.state = HEADER_VALUE;
-                    (*read_idx)++;
-                    break;
-                }
-
-                self.tmp_header_key.append_char(buf[*read_idx]);
-                (*read_idx)++;
+        case HEADER_KEY:
+            if (current == CR)
+            {
+                self.state = DOUBLE_LF;
                 break;
+            }
 
-            case HEADER_VALUE:
-                // If we have a LF out of place, we jump to the CR handler
-                // to return the error.
-                if (buf[*read_idx] == '\n')
-                {
-                    self.state = HEADER_CR;
-                    break;
-                }
+            if (current == ':')
+            {
+                self.state = HEADER_VALUE;
+                break;
+            }
 
-                if (buf[*read_idx] != '\r')
-                {
-                    self.tmp_header_val.append_char(buf[*read_idx]);
-                    (*read_idx)++;
-                    break;
-                }
+            self.header_key_cache.append_char(current);
+            break;
 
-                response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
+        case HEADER_VALUE:
+            // Handle incorrect ordering of CRLF.
+            if (current == LF) return MALFORMED_CRLF?;
+            if (current == CR)
+            {
+                response.parse_and_set_kv(self.header_key_cache, self.header_val_cache)!;
 
-                self.tmp_header_key.clear();
-                self.tmp_header_val.clear();
+                self.header_key_cache.clear();
+                self.header_val_cache.clear();
 
                 // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
                 // Transfer Encoding has precendence over Content-Length.
                 response.set_body_type();
 
-                self.state = HEADER_CR;
-
-                break;
-
-            case HEADER_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
                 self.state = HEADER_LF;
                 break;
+            }
 
-            case HEADER_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = HEADER_KEY;
-                break;
+            self.header_val_cache.append_char(current);
+            break;
 
-            case DOUBLE_CR:
-                handle_cr(buf[*read_idx], read_idx)!;
-                self.state = DOUBLE_LF;
-                break;
+        case HEADER_LF:
+            assert_lf(current)!;
+            self.state = HEADER_KEY;
+            break;
 
-            case DOUBLE_LF:
-                handle_lf(buf[*read_idx], read_idx)!;
-                self.state = COMPLETE;
-                return COMPLETE;
+        case DOUBLE_CR:
+            assert_cr(current)!;
+            self.state = DOUBLE_LF;
+            break;
 
-            default:
-                break;
-        }
+        case DOUBLE_LF:
+            assert_lf(current)!;
+            self.state = COMPLETE;
+            return COMPLETE;
+
+        default:
+            break;
     }
 
     return REQUEST_MORE;
