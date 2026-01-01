@@ -1,4 +1,4 @@
-module req;
+module req::http1;
 
 import std::io;
 
@@ -9,7 +9,7 @@ import std::io;
   body.
 
 *>
-macro void? @status_line_test(String input; @test_asserts(Response response, StatusLineParser parser, ParserResult result))
+macro void? @status_line_test(String input; @test_asserts(http1::Response response, StatusLineParser parser, ParserResult result))
 {
     StatusLineParser parser;
     parser.init(tmem);

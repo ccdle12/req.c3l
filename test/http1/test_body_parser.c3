@@ -1,4 +1,4 @@
-module req;
+module req::http1;
 
 import std::io;
 

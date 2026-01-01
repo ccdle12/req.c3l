@@ -1,4 +1,4 @@
-module req;
+module req::http1;
 
 fn void test_valid_tchar() @test
 {
