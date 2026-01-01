@@ -37,91 +37,73 @@ fn void HeaderParser.free(&self)
    self.tmp_header_val.free();
 }
 
-fn ParserResult? HeaderParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? HeaderParser.step(&self, char current, Response* response)
 {
-    usz *read_idx = &byte_buf.read_idx;
-    char current = byte_buf.bytes[*read_idx];
-
-        switch(self.state)
-        {
-            case HEADER_KEY:
-                if (current == '\r')
-                {
-                    self.state = DOUBLE_CR;
-                    break;
-                }
-
-                if (current == ':')
-                {
-                    self.state = HEADER_VALUE;
-                    current = byte_buf.read_byte()!;
-                    break;
-                }
-
-                self.tmp_header_key.append_char(current);
-                current = byte_buf.read_byte()!;
-                break;
-
-            case HEADER_VALUE:
-                // If we have a LF out of place, we jump to the CR handler
-                // to return the error.
-                if (current == '\n')
-                {
-                    self.state = HEADER_CR;
-                    break;
-                }
-
-                if (current != '\r')
-                {
-                    self.tmp_header_val.append_char(current);
-                    current = byte_buf.read_byte()!;
-                    break;
-                }
-
-                response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
-
-                self.tmp_header_key.clear();
-                self.tmp_header_val.clear();
-
-                // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
-                // Transfer Encoding has precendence over Content-Length.
-                response.set_body_type();
-
-                self.state = HEADER_CR;
-
-                break;
-
-            case HEADER_CR:
-                //handle_cr(buf[*read_idx], read_idx)!;
-                if (current != '\r') return MALFORMED_CRLF?;
-                current = byte_buf.read_byte()!;
-                self.state = HEADER_LF;
-                break;
-
-            case HEADER_LF:
-                //handle_lf(buf[*read_idx], read_idx)!;
-                if (current != '\n') return MALFORMED_CRLF?;
-                current = byte_buf.read_byte()!;
-                self.state = HEADER_KEY;
-                break;
-
-            case DOUBLE_CR:
-                //handle_cr(buf[*read_idx], read_idx)!;
-                if (current != '\r') return MALFORMED_CRLF?;
-                current = byte_buf.read_byte()!;
+    switch(self.state)
+    {
+        case HEADER_KEY:
+            if (current == '\r')
+            {
                 self.state = DOUBLE_LF;
                 break;
+            }
 
-            case DOUBLE_LF:
-                //handle_lf(buf[*read_idx], read_idx)!;
-                if (current != '\n') return MALFORMED_CRLF?;
-                current = byte_buf.read_byte()!;
-                self.state = COMPLETE;
-                return COMPLETE;
-
-            default:
+            if (current == ':')
+            {
+                self.state = HEADER_VALUE;
                 break;
-        }
+            }
+
+            self.tmp_header_key.append_char(current);
+            break;
+
+        case HEADER_VALUE:
+            // Handle incorrect ordering of crlf.
+            if (current == '\n') return MALFORMED_CRLF?;
+
+            if (current != '\r')
+            {
+                self.tmp_header_val.append_char(current);
+                break;
+            }
+
+            response.parse_and_set_kv(self.tmp_header_key, self.tmp_header_val)!;
+
+            self.tmp_header_key.clear();
+            self.tmp_header_val.clear();
+
+            // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
+            // Transfer Encoding has precendence over Content-Length.
+            response.set_body_type();
+
+            // TODO: Skipping over to LF since we confirmed CR here
+            self.state = HEADER_LF;
+
+            break;
+
+        case HEADER_CR:
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = HEADER_LF;
+            break;
+
+        case HEADER_LF:
+            if (current != '\n') return MALFORMED_CRLF?;
+            self.state = HEADER_KEY;
+            break;
+
+        case DOUBLE_CR:
+            if (current != '\r') return MALFORMED_CRLF?;
+            self.state = DOUBLE_LF;
+            break;
+
+        case DOUBLE_LF:
+            if (current != '\n') return MALFORMED_CRLF?;
+            self.state = COMPLETE;
+            return COMPLETE;
+
+        default:
+            break;
+    }
 
     return REQUEST_MORE;
 }

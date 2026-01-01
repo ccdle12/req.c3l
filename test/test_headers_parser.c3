@@ -15,7 +15,11 @@ macro void? @header_parser_test(String input; @test_asserts(Response response, H
     response.tinit();
 
     ParserResult result;
-    while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
+    while (buf.read_idx < buf.write_idx)
+    {
+        char current = buf.read_byte()!;
+        result = parser.step(current, &response)!;
+    }
     @test_asserts(response, parser, result);
 }
 

@@ -36,12 +36,13 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+//fn ParserResult? BodyParser.step(&self, io::ByteBuffer* byte_buf, Response* response)
+fn ParserResult? BodyParser.step(&self, char current, Response* response)
 {
     // TODO: Delete *read_idx once I update handle_cr and handle_lf to call read_byte?
     //  TODO: Maybe can even call read_byte() from the http_parser and just pass a copy of the char.
-    usz *read_idx = &byte_buf.read_idx;
-    char current = byte_buf.read_byte()!;
+    //usz *read_idx = &byte_buf.read_idx;
+    //char current = byte_buf.read_byte()!;
 
     switch(self.state)
     {

@@ -15,7 +15,11 @@ macro void? @body_parser_test(String input; @test_asserts(io::ByteBuffer* buf, R
     response.tinit();
 
     ParserResult result;
-    while (buf.read_idx < buf.write_idx) result = parser.step(&buf, &response)!;
+    while (buf.read_idx < buf.write_idx)
+    {
+        char current = buf.read_byte()!;
+        result = parser.step(current, &response)!;
+    }
     @test_asserts(&buf, &response, &parser, &result);
 }
 
@@ -46,7 +50,14 @@ fn void test_chunk_delayed_lf() @test
 
         String final_input = "\n";
         buf.write(final_input)!!;
-        test::eq(parser.step(buf, response)!!, ParserResult.REQUEST_MORE);
+
+        ParserResult result_1;
+        while (buf.read_idx < buf.write_idx)
+        {
+            char current = buf.read_byte()!!;
+            result_1 = parser.step(current, response)!!;
+        }
+        test::eq(result_1, ParserResult.REQUEST_MORE);
 
         // The chunk should now be written in the response body.
         test::@check(response.body.str_view().contains("Wiki"));
@@ -71,7 +82,13 @@ fn void test_zero_hex_and_double_crlf() @test
 
         String final_input = "\r\n";
         buf.write(final_input)!!;
-        while (buf.read_idx < buf.write_idx) parser.step(buf, response)!!;
+
+        while (buf.read_idx < buf.write_idx)
+        {
+            char current = buf.read_byte()!!;
+            (void)parser.step(current, response)!!;
+        }
+
         test::eq(parser.state, BodyParserState.COMPLETE);
     };
 }
@@ -101,7 +118,12 @@ fn void test_multiple_body_chunks() @test
             "\r\n";
         buf.write(final_input)!!;
 
-        while (buf.read_idx < buf.write_idx) parser.step(buf, response)!!;
+        //while (buf.read_idx < buf.write_idx) parser.step(buf, response)!!;
+        while (buf.read_idx < buf.write_idx)
+        {
+            char current = buf.read_byte()!!;
+            (void)parser.step(current, response)!!;
+        }
         test::eq(parser.state, BodyParserState.COMPLETE);
     };
 }
