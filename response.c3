@@ -27,15 +27,17 @@ struct Response
     // Status Line.
     String http_version;
     int status_code;
+    String reason_phrase; // Optional according to RFC 9112.
 
-    // Optional according to RFC 9112.
-    String reason_phrase;
-
+    // Headers
     LinkedHashMap{String, String} headers;
 
+    // Body
     BodyType body_type;
     DString body;
 }
+
+fn void Response.tinit(&self) => self.init(tmem);
 
 fn void Response.init(&self, Allocator allocator)
 {
@@ -43,8 +45,6 @@ fn void Response.init(&self, Allocator allocator)
     self.headers.init(self.allocator);
     self.body.init(self.allocator, MAX_SIZE);
 }
-
-fn void Response.tinit(&self) => self.init(tmem);
 
 fn void Response.free(&self)
 {
@@ -56,7 +56,6 @@ fn void? Response.parse_status_code(&self, String status_code)
 {
     if (status_code.len > 3) return INVALID_STATUS_CODE?;
     self.status_code = status_code.to_integer(int, 10)!;
-    return;
 }
 
 fn void? Response.parse_http_protocol(&self, String protocol)
@@ -67,13 +66,11 @@ fn void? Response.parse_http_protocol(&self, String protocol)
     }
 
     self.http_version = protocol;
-
-    return;
 }
 
 fn void? Response.parse_header(&self, String key)
 {
-    if (key[key.len - 1] == ' ') return INVALID_TRAILING_SPACE?;
+    if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
 
     foreach(c : key)
     {
@@ -84,8 +81,8 @@ fn void? Response.parse_header(&self, String key)
 fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_value)
 {
     String key = header_key.copy_str(self.allocator).to_lower_copy(self.allocator);
-
     self.parse_header(key)!;
+
     String value = header_value.copy_str(self.allocator).trim();
 
     self.headers.set(key, value);
@@ -97,9 +94,8 @@ fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_val
 // - gzip
 fn void Response.set_body_type(&self)
 {
-    if (self.headers.has_key("content-length")) self.body_type = CONTENT_LENGTH;
-    if (self.headers.has_key("transfer-encoding")) self.body_type = CHUNKED;
-    return;
+    if (self.headers.has_key(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
+    if (self.headers.has_key(TRANSFER_ENCODING)) self.body_type = CHUNKED;
 }
 
 fn String*? Response.get_header_ref(&self, String key)
@@ -116,15 +112,6 @@ fn String*? Response.get_header_ref(&self, String key)
 *>
 fn void Response.parse_body_type(&self)
 {
-    fault content_length_excuse = @catch(self.headers.get(CONTENT_LENGTH));
-    if (!content_length_excuse)
-    {
-        self.body_type = CONTENT_LENGTH;
-    }
-
-    fault chunked_excuse = @catch(self.headers.get(TRANSFER_ENCODING));
-    if (!chunked_excuse)
-    {
-        self.body_type = CHUNKED;
-    }
+    if (try self.headers.get(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
+    if (try self.headers.get(TRANSFER_ENCODING)) self.body_type = CHUNKED;
 }
