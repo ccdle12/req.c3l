@@ -27,7 +27,6 @@ struct Parser
     Allocator allocator;
     io::ByteBuffer buf;
     ParserState state;
-    Response response;
     StatusLineParser status_line_parser;
     HeaderParser header_parser;
     BodyParser body_parser;
@@ -37,8 +36,6 @@ fn void Parser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.buf.init(self.allocator, MAX_SIZE, INITIAL_CAPACITY);
-
-    self.response.init(self.allocator);
     self.status_line_parser.init(self.allocator);
     self.header_parser.init(self.allocator);
     self.body_parser.init(self.allocator);
@@ -51,14 +48,12 @@ fn void Parser.tinit(&self) => self.init(tmem);
 fn void Parser.free(&self)
 {
    self.buf.free();
-   self.response.free();
-
    self.status_line_parser.free();
    self.header_parser.free();
    self.body_parser.free();
 }
 
-fn ParserResult? Parser.step(&self, char[] input)
+fn ParserResult? Parser.step(&self, char[] input, Response* response)
 {
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
@@ -68,7 +63,7 @@ fn ParserResult? Parser.step(&self, char[] input)
         switch (self.state)
         {
             case STATUS_LINE:
-                ParserResult status_line = self.status_line_parser.step(current, &self.response)!;
+                ParserResult status_line = self.status_line_parser.step(current, response)!;
                 if (status_line == COMPLETE)
                 {
                     self.state = HEADER;
@@ -76,12 +71,12 @@ fn ParserResult? Parser.step(&self, char[] input)
                 break;
 
             case HEADER:
-                ParserResult header = self.header_parser.step(current, &self.response)!;
+                ParserResult header = self.header_parser.step(current, response)!;
                 if (header == COMPLETE)
                 {
                     self.state = BODY;
 
-                    if (self.response.body_type == NULL)
+                    if (response.body_type == NULL)
                     {
                         self.state = COMPLETE;
                         return COMPLETE;
@@ -91,7 +86,7 @@ fn ParserResult? Parser.step(&self, char[] input)
                 break;
 
             case BODY:
-                ParserResult body = self.body_parser.step(current, &self.response)!;
+                ParserResult body = self.body_parser.step(current, response)!;
                 if (body == COMPLETE) return COMPLETE;
                 break;
 
