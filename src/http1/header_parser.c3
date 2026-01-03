@@ -11,7 +11,7 @@ enum HeaderState
     COMPLETE,
 }
 
-struct HeaderParser (ParserStep)
+struct HeaderParser (HttpStepParser)
 {
     Allocator allocator;
     HeaderState state;
@@ -35,7 +35,7 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn ParserResult? HeaderParser.step(&self, char current, Response* response) @dynamic
+fn HttpParserResult? HeaderParser.step(&self, char current, Response* response) @dynamic
 {
     switch(self.state)
     {

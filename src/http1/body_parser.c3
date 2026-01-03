@@ -14,7 +14,7 @@ enum BodyParserState
     COMPLETE,
 }
 
-struct BodyParser (ParserStep)
+struct BodyParser (HttpStepParser)
 {
     Allocator allocator;
     BodyParserState state;
@@ -32,7 +32,7 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn ParserResult? BodyParser.step(&self, char current, Response* response) @dynamic
+fn HttpParserResult? BodyParser.step(&self, char current, Response* response) @dynamic
 {
     switch(self.state)
     {

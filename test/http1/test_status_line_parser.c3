@@ -33,7 +33,7 @@ fn void test_basic_status_line_0() @test
    {
        test::eq(fixture.response.http_version, "HTTP/1.1");
        test::eq(fixture.response.status_code, 200);
-       test::eq(fixture.result, ParserResult.COMPLETE);
+       test::eq(fixture.result, HttpParserResult.COMPLETE);
    }!!;
 }
 
@@ -46,7 +46,7 @@ fn void test_status_line_with_reason() @test
        test::eq(fixture.response.http_version, "HTTP/1.1");
        test::eq(fixture.response.status_code, 200);
        test::eq(fixture.response.reason_phrase, "OK");
-       test::eq(fixture.result, ParserResult.COMPLETE);
+       test::eq(fixture.result, HttpParserResult.COMPLETE);
    }!!;
 }
 
@@ -70,7 +70,7 @@ fn void test_missing_status_code() @test
    String input = "HTTP/1.0\r\n";
    @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(fixture.result, ParserResult.REQUEST_MORE);
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
    }!!;
 }
 
@@ -79,7 +79,7 @@ fn void test_empty_input() @test
    String input = "";
    @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(fixture.result, ParserResult.REQUEST_MORE);
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
    }!!;
 }
 
@@ -88,7 +88,7 @@ fn void test_single_malformed_lf() @test
    String input = "\n";
    @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(fixture.result, ParserResult.REQUEST_MORE);
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
    }!!;
 }
 
