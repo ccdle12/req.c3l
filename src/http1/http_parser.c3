@@ -8,14 +8,11 @@ const usz CRLF_OFFSET = 2;
 
 faultdef MALFORMED_CRLF;
 
-// TODO: Rename this to HttpStepHttpParser
-// TODO: Maybe HttpIncrementalHttpParser?
 interface HttpStepParser
 {
     fn HttpParserResult? step(char current, Response* response);
 }
 
-// TODO: renamse to HttpHttpParserState
 enum HttpParserState
 {
     STATUS_LINE,
@@ -24,7 +21,6 @@ enum HttpParserState
     COMPLETE,
 }
 
-// TODO: Maybe rename to HttpHttpParserResult
 enum HttpParserResult
 {
     REQUEST_MORE,
