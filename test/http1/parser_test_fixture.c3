@@ -29,9 +29,9 @@ fn HttpParserResult? ParserTestFixture.parse(&self, String input)
     buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
     buf.write(input)!;
 
-    while (try current = buf.read_byte())
+    while (try byte = buf.read_byte())
     {
-        self.result = self.parser.step(current, &self.response)!;
+        self.result = self.parser.step(byte, &self.response)!;
     }
 
     return self.result;

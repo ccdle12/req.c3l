@@ -35,12 +35,12 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-fn HttpParserResult? StatusLineParser.step(&self, char current, HttpResponse* response) @dynamic
+fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
         case HTTP_VERSION:
-            if (current == SP)
+            if (byte == SP)
             {
                 String s = self.status_protocol_cache.str_view();
                 defer self.status_protocol_cache.clear();
@@ -50,38 +50,38 @@ fn HttpParserResult? StatusLineParser.step(&self, char current, HttpResponse* re
                 break;
             }
 
-            self.status_protocol_cache.append_char(current);
+            self.status_protocol_cache.append_char(byte);
             break;
 
         case STATUS_CODE:
-            if (current == CR || current == SP)
+            if (byte == CR || byte == SP)
             {
                 String s = self.status_code_cache.str_view();
                 defer self.status_code_cache.clear();
                 if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
 
-                if (current == CR) self.state = STATUS_LINE_LF;
-                if (current == SP) self.state = OPTIONAL_REASON;
+                if (byte == CR) self.state = STATUS_LINE_LF;
+                if (byte == SP) self.state = OPTIONAL_REASON;
                 break;
             }
 
-            self.status_code_cache.append_char(current);
+            self.status_code_cache.append_char(byte);
             break;
 
         case STATUS_LINE_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = COMPLETE;
             return COMPLETE;
 
         case OPTIONAL_REASON:
-            if (current == CR || current == SP)
+            if (byte == CR || byte == SP)
             {
                 response.reason_phrase = self.status_line_reason.str_view();
                 self.state = STATUS_LINE_LF;
                 break;
             }
 
-            self.status_line_reason.append_char(current);
+            self.status_line_reason.append_char(byte);
             break;
 
         case COMPLETE:

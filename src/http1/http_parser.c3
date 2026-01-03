@@ -10,7 +10,7 @@ faultdef MALFORMED_CRLF;
 
 interface HttpStepParser
 {
-    fn HttpParserResult? step(char current, HttpResponse* response);
+    fn HttpParserResult? step(char byte, HttpResponse* response);
 }
 
 enum HttpParserState
@@ -63,12 +63,12 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
 
-    while (try current = self.buf.read_byte())
+    while (try byte = self.buf.read_byte())
     {
         switch (self.state)
         {
             case STATUS_LINE:
-                HttpParserResult status_line = self.status_line_parser.step(current, response)!;
+                HttpParserResult status_line = self.status_line_parser.step(byte, response)!;
                 if (status_line == COMPLETE)
                 {
                     self.state = HEADER;
@@ -76,7 +76,7 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                 break;
 
             case HEADER:
-                HttpParserResult header = self.header_parser.step(current, response)!;
+                HttpParserResult header = self.header_parser.step(byte, response)!;
                 if (header == COMPLETE)
                 {
                     self.state = BODY;
@@ -91,7 +91,7 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                 break;
 
             case BODY:
-                HttpParserResult body = self.body_parser.step(current, response)!;
+                HttpParserResult body = self.body_parser.step(byte, response)!;
                 if (body == COMPLETE) return COMPLETE;
                 break;
 
