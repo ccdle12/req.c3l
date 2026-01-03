@@ -12,7 +12,7 @@ enum HeaderState
     COMPLETE,
 }
 
-struct HeaderParser
+struct HeaderParser (ParserStep)
 {
     Allocator allocator;
     HeaderState state;
@@ -36,7 +36,7 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn ParserResult? HeaderParser.step(&self, char current, Response* response)
+fn ParserResult? HeaderParser.step(&self, char current, Response* response) @dynamic
 {
     switch(self.state)
     {
