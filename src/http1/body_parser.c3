@@ -5,20 +5,16 @@ import std::io;
 enum BodyParserState
 {
     HEX_NUM,
-    HEX_CR,
     HEX_LF,
     READ_CHUNK,
-    CHUNK_CR,
     CHUNK_LF,
-    ZERO_HEX_CR,
     ZERO_HEX_LF,
     EXTENSION,
-    DOUBLE_CR,
     DOUBLE_LF,
     COMPLETE,
 }
 
-struct BodyParser
+struct BodyParser (HttpStepParser)
 {
     Allocator allocator;
     BodyParserState state;
@@ -36,7 +32,7 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn ParserResult? BodyParser.step(&self, char current, Response* response)
+fn HttpParserResult? BodyParser.step(&self, char current, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
@@ -48,11 +44,11 @@ fn ParserResult? BodyParser.step(&self, char current, Response* response)
 
                 if (self.chunk_size == 0)
                 {
-                    self.state = ZERO_HEX_CR;
+                    self.state = ZERO_HEX_LF;
                     break;
                 }
 
-                self.state = HEX_CR;
+                self.state = HEX_LF;
 
                 break;
             }
@@ -60,13 +56,8 @@ fn ParserResult? BodyParser.step(&self, char current, Response* response)
             self.chunk_size_cache.append_char(current);
             break;
 
-        case HEX_CR:
-            if (current != CR) return MALFORMED_CRLF?;
-            self.state = HEX_LF;
-            break;
-
         case HEX_LF:
-            if (current != LF) return MALFORMED_CRLF?;
+            assert_lf(current)!;
             self.state = READ_CHUNK;
             break;
 
@@ -78,11 +69,6 @@ fn ParserResult? BodyParser.step(&self, char current, Response* response)
                 break;
             }
 
-            self.state = CHUNK_CR;
-            break;
-
-        case CHUNK_CR:
-            assert_cr(current)!;
             self.state = CHUNK_LF;
             break;
 
@@ -91,28 +77,22 @@ fn ParserResult? BodyParser.step(&self, char current, Response* response)
             self.state = HEX_NUM;
             break;
 
-        case ZERO_HEX_CR:
-            assert_cr(current)!;
-            self.state = ZERO_HEX_LF;
-            break;
-
         case ZERO_HEX_LF:
             assert_lf(current)!;
             self.state = EXTENSION;
             break;
 
         case EXTENSION:
-            assert_cr(current)!;
-            break;
-
-        case DOUBLE_CR:
-            assert_cr(current)!;
-            self.state = DOUBLE_LF;
+            if (current == CR) self.state = DOUBLE_LF;
             break;
 
         case DOUBLE_LF:
-            if (current == LF) self.state = COMPLETE;
-            break;
+            assert_lf(current)!;
+            self.state = COMPLETE;
+            return COMPLETE;
+
+        case COMPLETE:
+            return COMPLETE;
 
         default:
             break;

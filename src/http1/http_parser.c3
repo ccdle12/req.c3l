@@ -8,7 +8,12 @@ const usz CRLF_OFFSET = 2;
 
 faultdef MALFORMED_CRLF;
 
-enum ParserState
+interface HttpStepParser
+{
+    fn HttpParserResult? step(char current, HttpResponse* response);
+}
+
+enum HttpParserState
 {
     STATUS_LINE,
     HEADER,
@@ -16,23 +21,23 @@ enum ParserState
     COMPLETE,
 }
 
-enum ParserResult
+enum HttpParserResult
 {
     REQUEST_MORE,
     COMPLETE,
 }
 
-struct Parser
+struct HttpParser
 {
     Allocator allocator;
     io::ByteBuffer buf;
-    ParserState state;
+    HttpParserState state;
     StatusLineParser status_line_parser;
     HeaderParser header_parser;
     BodyParser body_parser;
 }
 
-fn void Parser.init(&self, Allocator allocator)
+fn void HttpParser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.buf.init(self.allocator, MAX_SIZE, INITIAL_CAPACITY);
@@ -43,9 +48,9 @@ fn void Parser.init(&self, Allocator allocator)
     self.state = STATUS_LINE;
 }
 
-fn void Parser.tinit(&self) => self.init(tmem);
+fn void HttpParser.tinit(&self) => self.init(tmem);
 
-fn void Parser.free(&self)
+fn void HttpParser.free(&self)
 {
    self.buf.free();
    self.status_line_parser.free();
@@ -53,7 +58,7 @@ fn void Parser.free(&self)
    self.body_parser.free();
 }
 
-fn ParserResult? Parser.step(&self, char[] input, Response* response)
+fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response)
 {
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
@@ -63,7 +68,7 @@ fn ParserResult? Parser.step(&self, char[] input, Response* response)
         switch (self.state)
         {
             case STATUS_LINE:
-                ParserResult status_line = self.status_line_parser.step(current, response)!;
+                HttpParserResult status_line = self.status_line_parser.step(current, response)!;
                 if (status_line == COMPLETE)
                 {
                     self.state = HEADER;
@@ -71,7 +76,7 @@ fn ParserResult? Parser.step(&self, char[] input, Response* response)
                 break;
 
             case HEADER:
-                ParserResult header = self.header_parser.step(current, response)!;
+                HttpParserResult header = self.header_parser.step(current, response)!;
                 if (header == COMPLETE)
                 {
                     self.state = BODY;
@@ -86,7 +91,7 @@ fn ParserResult? Parser.step(&self, char[] input, Response* response)
                 break;
 
             case BODY:
-                ParserResult body = self.body_parser.step(current, response)!;
+                HttpParserResult body = self.body_parser.step(current, response)!;
                 if (body == COMPLETE) return COMPLETE;
                 break;
 
@@ -101,4 +106,4 @@ fn ParserResult? Parser.step(&self, char[] input, Response* response)
     return REQUEST_MORE;
 }
 
-fn String Parser.buf_str_view(&self) => (String) self.buf.bytes;
+fn String HttpParser.buf_str_view(&self) => (String) self.buf.bytes;

@@ -2,29 +2,24 @@ module req::http1;
 
 import std::io;
 
-macro void? @header_parser_test(String input; @test_asserts(Response response, HeaderParser parser, ParserResult result))
+<*
+  A test helper to setup the ParserTestFixture using the HeaderParser for
+  each test.
+*>
+macro void? @run_header_parser_fixture(String input; @test_asserts(ParserTestFixture* fixture))
 {
     HeaderParser parser;
     parser.init(tmem);
 
-    io::ByteBuffer buf;
-    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-    buf.write(input)!;
-
-    Response response;
-    response.tinit();
-
-    ParserResult result;
-    while (try current = buf.read_byte())
+    @run_parser_test_fixture(input, &parser; ParserTestFixture* fixture)
     {
-        result = parser.step(current, &response)!;
-    }
-    @test_asserts(response, parser, result);
+        @test_asserts(fixture);
+    }!;
 }
 
-fn fault header_parser_error_test(String input)
+fn fault assert_header_parser_error(String input)
 {
-    return @catch(@header_parser_test(input; Response response, HeaderParser parser, ParserResult result){});
+    return @catch(@run_header_parser_fixture(input; ParserTestFixture* fixture){});
 }
 
 //// Test for RFC compliance. ////
@@ -45,12 +40,12 @@ fn void test_invalid_header_key_symbols() @test
 
     foreach (&header : invalid_headers)
     {
-        test::eq(header_parser_error_test(*header), INVALID_HEADER_KEY_SYMBOL);
+        test::eq(assert_header_parser_error(*header), INVALID_HEADER_KEY_SYMBOL);
     }
 }
 
 fn void test_invalid_whitespace_in_header() @test
 {
     String input = "Content-Type : \r\n";
-    test::eq(header_parser_error_test(input), INVALID_TRAILING_SPACE);
+    test::eq(assert_header_parser_error(input), INVALID_TRAILING_SPACE);
 }

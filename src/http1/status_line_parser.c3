@@ -11,7 +11,7 @@ enum StatusLineState
     COMPLETE,
 }
 
-struct StatusLineParser
+struct StatusLineParser (HttpStepParser)
 {
     Allocator allocator;
     StatusLineState state;
@@ -35,7 +35,7 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-fn ParserResult? StatusLineParser.step(&self, char current, Response* response)
+fn HttpParserResult? StatusLineParser.step(&self, char current, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
@@ -83,6 +83,9 @@ fn ParserResult? StatusLineParser.step(&self, char current, Response* response)
 
             self.status_line_reason.append_char(current);
             break;
+
+        case COMPLETE:
+            return COMPLETE;
 
         default:
             break;

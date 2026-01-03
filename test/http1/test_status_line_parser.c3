@@ -3,35 +3,23 @@ module req::http1;
 import std::io;
 
 <*
-  A test helper function to repeat setting up the parser, buffer and response.
-
-  The caller passes the string input as an arg and the test assertions in the
-  body.
-
+  A test helper to setup the ParserTestFixture using the StatusLineParser for
+  each test.
 *>
-macro void? @status_line_test(String input; @test_asserts(http1::Response response, StatusLineParser parser, ParserResult result))
+macro void? @run_status_line_fixture(String input; @test_asserts(ParserTestFixture* fixture))
 {
     StatusLineParser parser;
     parser.init(tmem);
 
-    io::ByteBuffer buf;
-    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-    buf.write(input)!;
-
-    Response response;
-    response.tinit();
-
-    ParserResult result;
-    while (try current = buf.read_byte())
+    @run_parser_test_fixture(input, &parser; ParserTestFixture* fixture)
     {
-        result = parser.step(current, &response)!;
-    }
-    @test_asserts(response, parser, result);
+        @test_asserts(fixture);
+    }!;
 }
 
-fn fault status_line_error_test(String input)
+fn fault assert_status_line_error(String input)
 {
-    return @catch(@status_line_test(input; Response response, StatusLineParser parser, ParserResult result){});
+    return @catch(@run_status_line_fixture(input; ParserTestFixture* fixture){});
 }
 
 //// Test for RFC compliance. ////
@@ -41,34 +29,32 @@ fn fault status_line_error_test(String input)
 fn void test_basic_status_line_0() @test
 {
    String input = "HTTP/1.1 200\r\n";
-
-   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
+   @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(response.http_version, "HTTP/1.1");
-       test::eq(response.status_code, 200);
-       test::eq(result, ParserResult.COMPLETE);
-   };
+       test::eq(fixture.response.http_version, "HTTP/1.1");
+       test::eq(fixture.response.status_code, 200);
+       test::eq(fixture.result, HttpParserResult.COMPLETE);
+   }!!;
 }
 
 // Test that we can have an optional reason.
 fn void test_status_line_with_reason() @test
 {
    String input = "HTTP/1.1 200 OK\r\n";
-
-   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
+   @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(response.http_version, "HTTP/1.1");
-       test::eq(response.status_code, 200);
-       test::eq(response.reason_phrase, "OK");
-       test::eq(parser.state, StatusLineState.COMPLETE);
-   };
+       test::eq(fixture.response.http_version, "HTTP/1.1");
+       test::eq(fixture.response.status_code, 200);
+       test::eq(fixture.response.reason_phrase, "OK");
+       test::eq(fixture.result, HttpParserResult.COMPLETE);
+   }!!;
 }
 
 // RFC 9110 15.5 - status code MUST be a 3 digit number.
 fn void invalid_status_code_length() @test
 {
     String input = "HTTP/1.1 40001 OK\r\n";
-    test::eq(status_line_error_test(input), INVALID_STATUS_CODE);
+    test::eq(assert_status_line_error(input), INVALID_STATUS_CODE);
 }
 
 //// Test for errors. ////
@@ -76,38 +62,38 @@ fn void invalid_status_code_length() @test
 fn void test_incorrect_http_version() @test
 {
    String input = "HTTP/2.0 200\r\n";
-   test::eq(status_line_error_test(input), INVALID_PROTOCOL_VERSION);
+   test::eq(assert_status_line_error(input), INVALID_PROTOCOL_VERSION);
 }
 
 fn void test_missing_status_code() @test
 {
    String input = "HTTP/1.0\r\n";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
+   @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(result, ParserResult.REQUEST_MORE);
-   };
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
+   }!!;
 }
 
 fn void test_empty_input() @test
 {
    String input = "";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
+   @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(result, ParserResult.REQUEST_MORE);
-   };
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
+   }!!;
 }
 
 fn void test_single_malformed_lf() @test
 {
    String input = "\n";
-   (void)@status_line_test(input; Response response, StatusLineParser parser, ParserResult result)
+   @run_status_line_fixture(input; ParserTestFixture* fixture)
    {
-       test::eq(result, ParserResult.REQUEST_MORE);
-   };
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
+   }!!;
 }
 
 fn void test_invalid_status_code() @test
 {
     String input = "HTTP/1.1 foo OK\r\n";
-    test::eq(status_line_error_test(input), INVALID_STATUS_CODE);
+    test::eq(assert_status_line_error(input), INVALID_STATUS_CODE);
 }
