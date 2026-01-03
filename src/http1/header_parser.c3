@@ -35,7 +35,7 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn HttpParserResult? HeaderParser.step(&self, char current, Response* response) @dynamic
+fn HttpParserResult? HeaderParser.step(&self, char current, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {

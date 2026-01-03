@@ -20,7 +20,7 @@ enum BodyType
     CONTENT_LENGTH,
 }
 
-struct Response
+struct HttpResponse
 {
     Allocator allocator;
 
@@ -37,28 +37,28 @@ struct Response
     DString body;
 }
 
-fn void Response.tinit(&self) => self.init(tmem);
+fn void HttpResponse.tinit(&self) => self.init(tmem);
 
-fn void Response.init(&self, Allocator allocator)
+fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.headers.init(self.allocator);
     self.body.init(self.allocator, MAX_SIZE);
 }
 
-fn void Response.free(&self)
+fn void HttpResponse.free(&self)
 {
     self.headers.free();
     self.body.free();
 }
 
-fn void? Response.parse_status_code(&self, String status_code)
+fn void? HttpResponse.parse_status_code(&self, String status_code)
 {
     if (status_code.len > 3) return INVALID_STATUS_CODE?;
     self.status_code = status_code.to_integer(int, 10)!;
 }
 
-fn void? Response.parse_http_protocol(&self, String protocol)
+fn void? HttpResponse.parse_http_protocol(&self, String protocol)
 {
     if (protocol != HTTP11 && protocol != HTTP10)
     {
@@ -68,7 +68,7 @@ fn void? Response.parse_http_protocol(&self, String protocol)
     self.http_version = protocol;
 }
 
-fn void? Response.parse_header(&self, String key)
+fn void? HttpResponse.parse_header(&self, String key)
 {
     if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
 
@@ -78,7 +78,7 @@ fn void? Response.parse_header(&self, String key)
     }
 }
 
-fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_value)
+fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header_value)
 {
     String key = header_key.copy_str(self.allocator).to_lower_copy(self.allocator);
     self.parse_header(key)!;
@@ -92,13 +92,13 @@ fn void? Response.parse_and_set_kv(&self, DString header_key, DString header_val
 // - compress
 // - deflate
 // - gzip
-fn void Response.set_body_type(&self)
+fn void HttpResponse.set_body_type(&self)
 {
     if (self.headers.has_key(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
     if (self.headers.has_key(TRANSFER_ENCODING)) self.body_type = CHUNKED;
 }
 
-fn String*? Response.get_header_ref(&self, String key)
+fn String*? HttpResponse.get_header_ref(&self, String key)
 {
     String k = key.trim().to_lower_copy(self.allocator);
     defer allocator::free(self.allocator, k);
@@ -110,7 +110,7 @@ fn String*? Response.get_header_ref(&self, String key)
    There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
    over Content-Length.
 *>
-fn void Response.parse_body_type(&self)
+fn void HttpResponse.parse_body_type(&self)
 {
     if (try self.headers.get(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
     if (try self.headers.get(TRANSFER_ENCODING)) self.body_type = CHUNKED;

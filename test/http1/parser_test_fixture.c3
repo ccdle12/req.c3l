@@ -5,7 +5,7 @@ import std::io;
 struct ParserTestFixture
 {
     HttpStepParser parser;
-    Response response;
+    HttpResponse response;
     HttpParserResult result;
 }
 

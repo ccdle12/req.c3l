@@ -10,7 +10,7 @@ faultdef MALFORMED_CRLF;
 
 interface HttpStepParser
 {
-    fn HttpParserResult? step(char current, Response* response);
+    fn HttpParserResult? step(char current, HttpResponse* response);
 }
 
 enum HttpParserState
@@ -58,7 +58,7 @@ fn void HttpParser.free(&self)
    self.body_parser.free();
 }
 
-fn HttpParserResult? HttpParser.step(&self, char[] input, Response* response)
+fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response)
 {
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;

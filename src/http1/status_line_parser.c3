@@ -35,7 +35,7 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-fn HttpParserResult? StatusLineParser.step(&self, char current, Response* response) @dynamic
+fn HttpParserResult? StatusLineParser.step(&self, char current, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
