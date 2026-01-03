@@ -32,12 +32,12 @@ fn void BodyParser.init(&self, Allocator allocator)
 fn void BodyParser.free(&self) => self.chunk_size_cache.free();
 
 // TODO: MAYBE should be step_body?, there should be some rule to identify chunk or not
-fn HttpParserResult? BodyParser.step(&self, char current, HttpResponse* response) @dynamic
+fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
         case HEX_NUM:
-            if (current == CR)
+            if (byte == CR)
             {
                 self.chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
                 self.chunk_size_cache.clear();
@@ -53,18 +53,18 @@ fn HttpParserResult? BodyParser.step(&self, char current, HttpResponse* response
                 break;
             }
 
-            self.chunk_size_cache.append_char(current);
+            self.chunk_size_cache.append_char(byte);
             break;
 
         case HEX_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = READ_CHUNK;
             break;
 
         case READ_CHUNK:
             if (self.chunk_size > 0)
             {
-                response.body.append_char(current);
+                response.body.append_char(byte);
                 self.chunk_size--;
                 break;
             }
@@ -73,21 +73,21 @@ fn HttpParserResult? BodyParser.step(&self, char current, HttpResponse* response
             break;
 
         case CHUNK_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = HEX_NUM;
             break;
 
         case ZERO_HEX_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = EXTENSION;
             break;
 
         case EXTENSION:
-            if (current == CR) self.state = DOUBLE_LF;
+            if (byte == CR) self.state = DOUBLE_LF;
             break;
 
         case DOUBLE_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = COMPLETE;
             return COMPLETE;
 

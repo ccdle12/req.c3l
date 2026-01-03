@@ -35,30 +35,30 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn HttpParserResult? HeaderParser.step(&self, char current, HttpResponse* response) @dynamic
+fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
         case HEADER_KEY:
-            if (current == CR)
+            if (byte == CR)
             {
                 self.state = DOUBLE_LF;
                 break;
             }
 
-            if (current == ':')
+            if (byte == ':')
             {
                 self.state = HEADER_VALUE;
                 break;
             }
 
-            self.header_key_cache.append_char(current);
+            self.header_key_cache.append_char(byte);
             break;
 
         case HEADER_VALUE:
             // Handle incorrect ordering of CRLF.
-            if (current == LF) return MALFORMED_CRLF?;
-            if (current == CR)
+            if (byte == LF) return MALFORMED_CRLF?;
+            if (byte == CR)
             {
                 response.parse_and_set_kv(self.header_key_cache, self.header_val_cache)!;
 
@@ -73,17 +73,20 @@ fn HttpParserResult? HeaderParser.step(&self, char current, HttpResponse* respon
                 break;
             }
 
-            self.header_val_cache.append_char(current);
+            self.header_val_cache.append_char(byte);
             break;
 
         case HEADER_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = HEADER_KEY;
             break;
 
         case DOUBLE_LF:
-            assert_lf(current)!;
+            assert_lf(byte)!;
             self.state = COMPLETE;
+            return COMPLETE;
+
+        case COMPLETE:
             return COMPLETE;
 
         default:

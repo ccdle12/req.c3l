@@ -42,7 +42,7 @@ fn void test_chunk_delayed_lf() @test
         test::eq(parser.state, BodyParserState.CHUNK_LF);
 
         String final_input = "\n";
-        test::eq(fixture.parse(final_input), HttpParserResult.REQUEST_MORE);
+        test::eq(fixture.parse(final_input)!!, HttpParserResult.REQUEST_MORE);
 
         // The chunk should now be written in the response body.
         test::@check(fixture.response.body.str_view().contains("Wiki"));
@@ -66,7 +66,7 @@ fn void test_zero_hex_and_double_crlf() @test
         test::eq(parser.state, BodyParserState.EXTENSION);
 
         String final_input = "\r\n";
-        test::eq(fixture.parse(final_input), HttpParserResult.COMPLETE);
+        test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
         test::eq(parser.state, BodyParserState.COMPLETE);
     }!!;
 }
@@ -94,7 +94,7 @@ fn void test_multiple_body_chunks() @test
         String final_input =
             "0\r\n"
             "\r\n";
-        test::eq(fixture.parse(final_input), HttpParserResult.COMPLETE);
+        test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
         test::eq(parser.state, BodyParserState.COMPLETE);
     }!!;
 }
