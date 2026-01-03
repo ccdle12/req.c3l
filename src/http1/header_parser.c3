@@ -7,7 +7,6 @@ enum HeaderState
     HEADER_KEY,
     HEADER_VALUE,
     HEADER_LF,
-    DOUBLE_CR,
     DOUBLE_LF,
     COMPLETE,
 }
@@ -80,11 +79,6 @@ fn ParserResult? HeaderParser.step(&self, char current, Response* response) @dyn
         case HEADER_LF:
             assert_lf(current)!;
             self.state = HEADER_KEY;
-            break;
-
-        case DOUBLE_CR:
-            assert_cr(current)!;
-            self.state = DOUBLE_LF;
             break;
 
         case DOUBLE_LF:

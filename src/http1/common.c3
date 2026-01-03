@@ -35,14 +35,6 @@ fn bool is_tchar(char c)
 }
 
 <*
-  Common function to handle a CR when stepping in the parsers.
-*>
-fn void? assert_cr(char c)
-{
-    if (c != CR) return MALFORMED_CRLF?;
-}
-
-<*
   Common function to handle an LF when stepping in the parsers.
 *>
 fn void? assert_lf(char c)

@@ -7,7 +7,6 @@ enum BodyParserState
     HEX_NUM,
     HEX_LF,
     READ_CHUNK,
-    CHUNK_CR,
     CHUNK_LF,
     ZERO_HEX_LF,
     EXTENSION,
@@ -70,11 +69,6 @@ fn ParserResult? BodyParser.step(&self, char current, Response* response) @dynam
                 break;
             }
 
-            self.state = CHUNK_LF;
-            break;
-
-        case CHUNK_CR:
-            assert_cr(current)!;
             self.state = CHUNK_LF;
             break;
 
