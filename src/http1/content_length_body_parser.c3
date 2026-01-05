@@ -1,7 +1,5 @@
 module req::http1;
 
-import std::io;
-
 enum ContentLengthBodyParserState
 {
     READ_CONTENT,
