@@ -17,7 +17,7 @@ enum BodyType
 {
     NULL,
     CHUNKED,
-    CONTENT_LENGTH_KEY,
+    CONTENT_LENGTH,
 }
 
 struct HttpResponse
@@ -98,8 +98,8 @@ fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header
 // - gzip
 fn void HttpResponse.set_body_type(&self)
 {
-    if (self.headers.has_key(CONTENT_LENGTH_KEY))    self.body_type = CONTENT_LENGTH_KEY;
-    if (self.headers.has_key(TRANSFER_ENCODING)) self.body_type = CHUNKED;
+    if (self.headers.has_key(CONTENT_LENGTH_KEY)) self.body_type = CONTENT_LENGTH;
+    if (self.headers.has_key(TRANSFER_ENCODING))  self.body_type = CHUNKED;
 }
 
 fn String*? HttpResponse.get_header_ref(&self, String key)
@@ -116,8 +116,8 @@ fn String*? HttpResponse.get_header_ref(&self, String key)
 *>
 fn void HttpResponse.parse_body_type(&self)
 {
-    if (try self.headers.get(CONTENT_LENGTH_KEY))    self.body_type = CONTENT_LENGTH_KEY;
-    if (try self.headers.get(TRANSFER_ENCODING)) self.body_type = CHUNKED;
+    if (try self.headers.get(CONTENT_LENGTH_KEY)) self.body_type = CONTENT_LENGTH;
+    if (try self.headers.get(TRANSFER_ENCODING))  self.body_type = CHUNKED;
 }
 
 <*

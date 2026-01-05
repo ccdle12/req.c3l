@@ -87,7 +87,7 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                         return COMPLETE;
                     }
 
-                    if (response.body_type == CONTENT_LENGTH_KEY)
+                    if (response.body_type == CONTENT_LENGTH)
                     {
                         if (try content_length = response.get_content_length())
                         {
