@@ -25,6 +25,7 @@ fn void ParserTestFixture.init(&self, HttpStepParser parser)
 *>
 fn HttpParserResult? ParserTestFixture.parse(&self, String input)
 {
+    io::printfn("parse input: %s", input);
     io::ByteBuffer buf;
     buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
     buf.write(input)!;
@@ -49,6 +50,5 @@ macro void? @run_parser_test_fixture(String input, HttpStepParser parser; @test_
     ParserTestFixture fixture;
     fixture.init(parser);
     fixture.parse(input)!;
-
     @test_asserts(&fixture);
 }

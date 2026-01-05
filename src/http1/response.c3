@@ -34,6 +34,7 @@ struct HttpResponse
 
     // Body
     BodyType body_type;
+    ulong content_length;
     DString body;
 }
 
@@ -41,13 +42,25 @@ fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.headers.init(self.allocator);
+    self.content_length = 0;
     self.body.init(self.allocator, MAX_SIZE);
 }
 
 fn void HttpResponse.tinit(&self) => self.init(tmem);
 
+fn void HttpResponse.clear(&self)
+{
+    self.content_length = 0;
+    //TODO: Reset BodyType to NULL
+    //TODO: Clear body
+    //TODO: Clear reason_phrase
+    //TODO: Clear http_version
+    //TODO: Clear status_code
+}
+
 fn void HttpResponse.free(&self)
 {
+    self.clear();
     self.headers.free();
     self.body.free();
 }

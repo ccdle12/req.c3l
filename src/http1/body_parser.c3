@@ -6,12 +6,14 @@ struct BodyParser (HttpStepParser)
 {
     Allocator allocator;
     ChunkBodyParser chunk_body_parser;
+    ContentLengthBodyParser content_length_body_parser;
 }
 
 fn void BodyParser.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.chunk_body_parser.init(self.allocator);
+    self.content_length_body_parser.init();
 }
 
 fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* response) @dynamic
@@ -23,8 +25,7 @@ fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* response) @
         case CHUNKED:
             return self.chunk_body_parser.step(byte, response)!;
         case CONTENT_LENGTH:
-            break;
-
+            return self.content_length_body_parser.step(byte, response)!;
     }
 
     return COMPLETE;
