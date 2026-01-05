@@ -87,10 +87,16 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                         return COMPLETE;
                     }
 
-                    if (response.body_type == CONTENT_LENGTH && response.content_length == 0)
+                    if (response.body_type == CONTENT_LENGTH)
                     {
-                        self.state = COMPLETE;
-                        return COMPLETE;
+                        if (try content_length = response.get_content_length())
+                        {
+                            if (content_length == 0)
+                            {
+                                self.state = COMPLETE;
+                                return COMPLETE;
+                            }
+                        }
                     }
                 }
 

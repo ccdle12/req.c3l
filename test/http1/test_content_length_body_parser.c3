@@ -6,14 +6,19 @@ import std::io;
   A test helper to setup the ParserTestFixture using the ContentLengthBodyParser for
   each test.
 *>
-macro void? @run_content_length_body_parser_test(String input, ulong content_length; @test_asserts(ParserTestFixture* fixture))
+macro void? @run_content_length_body_parser_test(String input, ulong content_length_num; @test_asserts(ParserTestFixture* fixture))
 {
     ContentLengthBodyParser parser;
     parser.init();
 
     ParserTestFixture fixture;
     fixture.init(&parser);
-    fixture.response.content_length = content_length;
+
+    DString value;
+    value.tinit();
+    value.appendf("%d", content_length_num);
+
+    fixture.response.headers.set(CONTENT_LENGTH, value.str_view());
 
     fixture.parse(input)!!;
     @test_asserts(&fixture);
