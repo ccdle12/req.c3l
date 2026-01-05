@@ -7,16 +7,6 @@ const char LF = '\n';
 const char SP = ' ';
 
 <*
-  Identifier for Body Types in HTTP Headers.
-*>
-enum BodyType
-{
-    NULL,
-    CHUNKED,
-    CONTENT_LENGTH,
-}
-
-<*
   Checks for valid characters allowed for HTTP Header keys.
 *>
 fn bool is_tchar(char c)
