@@ -100,19 +100,28 @@ fn void test_with_allocator() @test
       "vary: Accept-Encoding \r\n"
       "via: 1.1 Caddy \r\n"
       "transfer-encoding: chunked \r\n"
+      "\r\n"
+      "4\r\n"
+      "Wiki\r\n"
+      "5\r\n"
+      "pedia\r\n"
+      "E\r\n"
+      " in\r\n"
+      "\r\n"
+      "chunks.\r\n"
+      "0\r\n"
       "\r\n";
 
-    LibcAllocator alloc;
-
     HttpParser parser;
-    parser.init(&alloc);
+    parser.init(mem);
     defer parser.free();
 
     HttpResponse response;
-    response.tinit();
+    response.init(mem);
     defer response.free();
 
-    test::eq(parser.step(input, &response)!!, HttpParserResult.REQUEST_MORE);
+    test::eq(parser.step(input, &response)!!, HttpParserResult.COMPLETE);
+    test::@check(response.body.str_view().contains("chunks."));
 }
 
 fn void test_full_header() @test
@@ -124,8 +133,7 @@ fn void test_full_header() @test
       "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
       "vary: Accept-Encoding \r\n"
       "via: 1.1 Caddy \r\n"
-      "transfer-encoding: chunked \r\n"
-      "\r\n";
+      "transfer-encoding: chunked \r\n";
 
     @run_http_parser_test(input; HttpParser* parser, HttpParserResult* result, HttpResponse* response)
     {

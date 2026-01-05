@@ -37,14 +37,14 @@ struct HttpResponse
     DString body;
 }
 
-fn void HttpResponse.tinit(&self) => self.init(tmem);
-
 fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.headers.init(self.allocator);
     self.body.init(self.allocator, MAX_SIZE);
 }
+
+fn void HttpResponse.tinit(&self) => self.init(tmem);
 
 fn void HttpResponse.free(&self)
 {
@@ -80,12 +80,16 @@ fn void? HttpResponse.parse_header(&self, String key)
 
 fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header_value)
 {
-    String key = header_key.copy_str(self.allocator).to_lower_copy(self.allocator);
+    String key = header_key.copy_str(self.allocator);
+    key.convert_to_lower();
+    defer key.free(self.allocator);
+
     self.parse_header(key)!;
 
-    String value = header_value.copy_str(self.allocator).trim();
+    String value = header_value.copy_str(self.allocator);
+    defer value.free(self.allocator);
 
-    self.headers.set(key, value);
+    self.headers.set(key, value.trim());
 }
 
 // TODO: This is naive setting for now, we need to be able to handle:
