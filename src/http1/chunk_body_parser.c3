@@ -88,11 +88,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
             self.state = COMPLETE;
             return COMPLETE;
 
-        case COMPLETE:
-            return COMPLETE;
-
-        default:
-            break;
+        case COMPLETE: return COMPLETE;
     }
 
     return REQUEST_MORE;

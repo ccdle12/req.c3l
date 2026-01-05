@@ -267,6 +267,26 @@ fn void test_malformed_crlf_1() @test
     test::eq(parser_error_test(input), MALFORMED_CRLF);
 }
 
+fn void test_empty_body_and_0_content_length() @test
+{
+    String input =
+      "HTTP/1.1 200 OK\r\n"
+      "access-control-allow-origin: *\r\n"
+      "content-type: application/json \r\n"
+      "Content-Length: 0 \r\n"
+      "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
+      "vary: Accept-Encoding \r\n"
+      "via: 1.1 Caddy \r\n"
+      "\r\n"
+      "";
+
+    @run_http_parser_test(input; HttpParser* parser, HttpParserResult* result, HttpResponse* response)
+    {
+        test::eq(*result, HttpParserResult.COMPLETE);
+        test::@check(response.body.str_view() == "");
+    }!!;
+}
+
 // TODO: This should be detected some how? the length of the long header
 // with multiple headers could be considered value.
 // Right now it returns MALFORMED_CRLF, I'm not the precise reason that is being

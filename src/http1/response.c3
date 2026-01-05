@@ -10,14 +10,14 @@ faultdef INVALID_PROTOCOL_VERSION,
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
-const String CONTENT_LENGTH = "content-length";
+const String CONTENT_LENGTH_KEY = "content-length";
 const String TRANSFER_ENCODING = "transfer-encoding";
 
 enum BodyType
 {
     NULL,
     CHUNKED,
-    CONTENT_LENGTH,
+    CONTENT_LENGTH_KEY,
 }
 
 struct HttpResponse
@@ -98,7 +98,7 @@ fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header
 // - gzip
 fn void HttpResponse.set_body_type(&self)
 {
-    if (self.headers.has_key(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
+    if (self.headers.has_key(CONTENT_LENGTH_KEY))    self.body_type = CONTENT_LENGTH_KEY;
     if (self.headers.has_key(TRANSFER_ENCODING)) self.body_type = CHUNKED;
 }
 
@@ -116,6 +116,15 @@ fn String*? HttpResponse.get_header_ref(&self, String key)
 *>
 fn void HttpResponse.parse_body_type(&self)
 {
-    if (try self.headers.get(CONTENT_LENGTH))    self.body_type = CONTENT_LENGTH;
+    if (try self.headers.get(CONTENT_LENGTH_KEY))    self.body_type = CONTENT_LENGTH_KEY;
     if (try self.headers.get(TRANSFER_ENCODING)) self.body_type = CHUNKED;
+}
+
+<*
+  Returns the value of the content length header if it's available.
+*>
+fn ulong? HttpResponse.get_content_length(&self)
+{
+    String* content_length = self.get_header_ref(CONTENT_LENGTH_KEY)!;
+    return content_length.to_integer(ulong)!;
 }

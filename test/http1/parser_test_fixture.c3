@@ -49,6 +49,5 @@ macro void? @run_parser_test_fixture(String input, HttpStepParser parser; @test_
     ParserTestFixture fixture;
     fixture.init(parser);
     fixture.parse(input)!;
-
     @test_asserts(&fixture);
 }

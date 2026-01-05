@@ -41,3 +41,11 @@ fn void? assert_lf(char c)
 {
     if (c != LF) return MALFORMED_CRLF?;
 }
+
+<*
+  Common function to handle an CR when stepping in the parsers.
+*>
+fn void? assert_cr(char c)
+{
+    if (c != CR) return MALFORMED_CRLF?;
+}

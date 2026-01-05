@@ -86,11 +86,7 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             self.state = COMPLETE;
             return COMPLETE;
 
-        case COMPLETE:
-            return COMPLETE;
-
-        default:
-            break;
+        case COMPLETE: return COMPLETE;
     }
 
     return REQUEST_MORE;
