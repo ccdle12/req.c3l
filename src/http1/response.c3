@@ -4,14 +4,13 @@ import std::collections::map;
 
 faultdef INVALID_PROTOCOL_VERSION,
          INVALID_HEADER_KEY_SYMBOL,
-         MALFORMED_STATUS_LINE,
          INVALID_STATUS_CODE,
          INVALID_TRAILING_SPACE;
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
 const String CONTENT_LENGTH_KEY = "content-length";
-const String TRANSFER_ENCODING = "transfer-encoding";
+const String TRANSFER_ENCODING_KEY = "transfer-encoding";
 
 enum BodyType
 {
@@ -99,7 +98,7 @@ fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header
 fn void HttpResponse.set_body_type(&self)
 {
     if (self.headers.has_key(CONTENT_LENGTH_KEY)) self.body_type = CONTENT_LENGTH;
-    if (self.headers.has_key(TRANSFER_ENCODING))  self.body_type = CHUNKED;
+    if (self.headers.has_key(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
 fn String*? HttpResponse.get_header_ref(&self, String key)
@@ -117,7 +116,7 @@ fn String*? HttpResponse.get_header_ref(&self, String key)
 fn void HttpResponse.parse_body_type(&self)
 {
     if (try self.headers.get(CONTENT_LENGTH_KEY)) self.body_type = CONTENT_LENGTH;
-    if (try self.headers.get(TRANSFER_ENCODING))  self.body_type = CHUNKED;
+    if (try self.headers.get(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
 <*
