@@ -128,7 +128,7 @@ fn void test_full_header() @test
 {
     String input =
       "HTTP/1.1 200 OK\r\n"
-      "access-control-allow-origin: *\r\n"
+      "access-control-allow-origin: * \r\n"
       "content-type: application/json \r\n"
       "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
       "vary: Accept-Encoding \r\n"

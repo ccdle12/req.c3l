@@ -100,7 +100,7 @@ fn void HttpResponse.set_body_type(&self)
 fn String*? HttpResponse.get_header_ref(&self, String key) => @pool()
 {
     String k = key.trim().to_lower_tcopy();
-    return self.headers.get_ref(k)!;
+    return self.headers.get_ref(k);
 }
 
 <* According to RFC9112 6.1:
