@@ -1,6 +1,7 @@
 module req::http1;
 
 import std::io;
+import std::collections;
 
 <*
   A test helper to setup the ParserTestFixture using the ChunkBodyParser for
@@ -63,7 +64,7 @@ fn void test_zero_hex_and_double_crlf() @test
     @run_chunk_body_parser_test(input; ParserTestFixture* fixture, ChunkBodyParser* parser)
     {
         test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
-        test::eq(parser.state, ChunkBodyParserState.EXTENSION);
+        test::eq(parser.state, ChunkBodyParserState.DOUBLE_CR);
 
         String final_input = "\r\n";
         test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
@@ -96,6 +97,30 @@ fn void test_multiple_body_chunks() @test
             "\r\n";
         test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
         test::eq(parser.state, ChunkBodyParserState.COMPLETE);
+    }!!;
+}
+
+fn void test_chunk_body_extensions() @test
+{
+
+    String input =
+        "4;ext1=val1;flag\r\n"
+        "Wiki\r\n"
+        "5;ext2=\"a;quoted\"value\";ext4=42\r\n"
+        "pedia\r\n";
+
+    @run_chunk_body_parser_test(input; ParserTestFixture* fixture, ChunkBodyParser* parser)
+    {
+        HashMap{String, String}* map = &fixture.response.extensions;
+
+        test::@check(*map.get_ref("ext1")!! == "val1");
+        test::@check(*map.get_ref("flag")!! == "flag");
+        test::@check(*map.get_ref("ext2")!! == "\"a");
+        test::@check(*map.get_ref("quoted\"value\"")!! == "quoted\"value\"");
+        test::@check(*map.get_ref("ext4")!! == "42");
+
+        test::@check(fixture.response.body.str_view().contains("Wiki"));
+        test::@check(fixture.response.body.str_view().contains("pedia"));
     }!!;
 }
 
