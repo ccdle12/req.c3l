@@ -105,6 +105,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
                     }
                 };
 
+                // TODO: For some reason, calling clear() causes UB access.
                 self.extensions_cache.free();
                 self.extensions_cache.init(self.allocator);
 
