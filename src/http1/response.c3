@@ -62,11 +62,7 @@ fn void? HttpResponse.parse_status_code(&self, String status_code)
 
 fn void? HttpResponse.parse_http_protocol(&self, String protocol)
 {
-    if (protocol != HTTP11 && protocol != HTTP10)
-    {
-        return INVALID_PROTOCOL_VERSION?;
-    }
-
+    if (protocol != HTTP11 && protocol != HTTP10) return INVALID_PROTOCOL_VERSION?;
     self.http_version = protocol;
 }
 
@@ -80,18 +76,15 @@ fn void? HttpResponse.parse_header(&self, String key)
     }
 }
 
-fn void? HttpResponse.parse_and_set_kv(&self, DString header_key, DString header_value)
+fn void? HttpResponse.parse_and_set_kv(&self, String header_key, String header_value) => @pool()
 {
-    String key = header_key.copy_str(self.allocator);
-    key.convert_to_lower();
-    defer key.free(self.allocator);
-
+    String key = header_key.to_lower_tcopy();
     self.parse_header(key)!;
 
-    String value = header_value.copy_str(self.allocator);
+    String value = header_value.copy(self.allocator);
     defer value.free(self.allocator);
 
-    self.headers.set(key, value.trim());
+    self.headers.set(key.trim(), value.trim());
 }
 
 // TODO: This is naive setting for now, we need to be able to handle:
@@ -104,11 +97,9 @@ fn void HttpResponse.set_body_type(&self)
     if (self.headers.has_key(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
-fn String*? HttpResponse.get_header_ref(&self, String key)
+fn String*? HttpResponse.get_header_ref(&self, String key) => @pool()
 {
-    String k = key.trim().to_lower_copy(self.allocator);
-    defer allocator::free(self.allocator, k);
-
+    String k = key.trim().to_lower_tcopy();
     return self.headers.get_ref(k)!;
 }
 
@@ -128,5 +119,5 @@ fn void HttpResponse.parse_body_type(&self)
 fn ulong? HttpResponse.get_content_length(&self)
 {
     String* content_length = self.get_header_ref(CONTENT_LENGTH_KEY)!;
-    return content_length.to_integer(ulong)!;
+    return content_length.to_integer(ulong);
 }
