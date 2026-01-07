@@ -53,7 +53,6 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             }
 
             self.header_key_cache.append_char(byte);
-            break;
 
         case HEADER_VALUE:
             // Handle incorrect ordering of CRLF.
@@ -74,12 +73,10 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             }
 
             self.header_val_cache.append_char(byte);
-            break;
 
         case HEADER_LF:
             assert_lf(byte)!;
             self.state = HEADER_KEY;
-            break;
 
         case DOUBLE_LF:
             assert_lf(byte)!;

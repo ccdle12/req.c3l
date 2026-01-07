@@ -51,7 +51,6 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
             }
 
             self.status_protocol_cache.append_char(byte);
-            break;
 
         case STATUS_CODE:
             if (byte == CR || byte == SP)
@@ -66,7 +65,6 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
             }
 
             self.status_code_cache.append_char(byte);
-            break;
 
         case STATUS_LINE_LF:
             assert_lf(byte)!;
@@ -82,13 +80,8 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
             }
 
             self.status_line_reason.append_char(byte);
-            break;
 
-        case COMPLETE:
-            return COMPLETE;
-
-        default:
-            break;
+        case COMPLETE: return COMPLETE;
     }
 
     return REQUEST_MORE;

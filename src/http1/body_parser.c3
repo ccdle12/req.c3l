@@ -20,8 +20,7 @@ fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* response) @
 {
     switch(response.body_type)
     {
-        case NULL:
-            break;
+        case NULL: break;
         case CHUNKED:
             return self.chunk_body_parser.step(byte, response)!;
         case CONTENT_LENGTH:

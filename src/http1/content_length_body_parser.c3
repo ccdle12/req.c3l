@@ -39,8 +39,6 @@ fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse
                     }
                 }
 
-                break;
-
             case COMPLETE: return COMPLETE;
         }
     }

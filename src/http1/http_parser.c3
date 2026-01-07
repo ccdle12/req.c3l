@@ -73,7 +73,6 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                 {
                     self.state = HEADER;
                 }
-                break;
 
             case HEADER:
                 HttpParserResult header = self.header_parser.step(byte, response)!;
@@ -100,12 +99,9 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                     }
                 }
 
-                break;
-
             case BODY:
                 HttpParserResult body = self.body_parser.step(byte, response)!;
                 if (body == COMPLETE) return COMPLETE;
-                break;
 
             case COMPLETE: return COMPLETE;
         }
