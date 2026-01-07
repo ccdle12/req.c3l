@@ -8,6 +8,7 @@ enum ChunkBodyParserState
     CHUNK_LF,
     ZERO_HEX_LF,
     EXTENSION,
+    DOUBLE_CR,
     DOUBLE_LF,
     COMPLETE,
 }
@@ -18,6 +19,7 @@ struct ChunkBodyParser (HttpStepParser)
     ulong chunk_size;
     ChunkBodyParserState state;
     DString chunk_size_cache;
+    DString extensions_cache;
 }
 
 fn void ChunkBodyParser.init(&self, Allocator allocator)
@@ -25,19 +27,24 @@ fn void ChunkBodyParser.init(&self, Allocator allocator)
     self.allocator = allocator;
     self.state = HEX_NUM;
     self.chunk_size_cache.init(self.allocator);
+    self.extensions_cache.init(self.allocator);
 }
 
-fn void ChunkBodyParser.free(&self) => self.chunk_size_cache.free();
+fn void ChunkBodyParser.free(&self)
+{
+    self.chunk_size_cache.free();
+    self.extensions_cache.free();
+}
 
 fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* response) @dynamic
 {
     switch(self.state)
     {
         case HEX_NUM:
-            if (byte == CR)
+            if (byte == CR || byte == ';')
             {
                 self.chunk_size = self.chunk_size_cache.str_view().to_uint(base: 16)!;
-                self.chunk_size_cache.clear();
+                defer self.chunk_size_cache.clear();
 
                 if (self.chunk_size == 0)
                 {
@@ -45,8 +52,13 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
                     break;
                 }
 
-                self.state = HEX_LF;
+                if (byte == ';')
+                {
+                    self.state = EXTENSION;
+                    break;
+                }
 
+                self.state = HEX_LF;
                 break;
             }
 
@@ -76,11 +88,41 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
 
         case ZERO_HEX_LF:
             assert_lf(byte)!;
-            self.state = EXTENSION;
+            self.state = DOUBLE_CR;
             break;
 
         case EXTENSION:
-            if (byte == CR) self.state = DOUBLE_LF;
+            if (byte == CR)
+            {
+                @pool()
+                {
+                    String[] split_extensions = self.extensions_cache
+                                                    .str_view()
+                                                    .tsplit(";");
+                    foreach (&ext : split_extensions)
+                    {
+                        String[] kv = ext.tsplit("=");
+
+                        String key = kv[0].trim().to_lower_tcopy();
+                        String value = (kv.len > 1) ? kv[1] : kv[0];
+
+                        response.extensions.set(key, value.trim());
+                    }
+                };
+
+                self.extensions_cache.free();
+                self.extensions_cache.init(self.allocator);
+
+                self.state = HEX_LF;
+                break;
+            }
+
+            self.extensions_cache.append_char(byte);
+            break;
+
+        case DOUBLE_CR:
+            assert_cr(byte)!;
+            self.state = DOUBLE_LF;
             break;
 
         case DOUBLE_LF:
