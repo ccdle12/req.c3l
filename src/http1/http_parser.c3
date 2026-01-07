@@ -69,11 +69,7 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
         {
             case STATUS_LINE:
                 HttpParserResult status_line = self.status_line_parser.step(byte, response)!;
-                if (status_line == COMPLETE)
-                {
-                    self.state = HEADER;
-                }
-                break;
+                if (status_line == COMPLETE) self.state = HEADER;
 
             case HEADER:
                 HttpParserResult header = self.header_parser.step(byte, response)!;
@@ -89,23 +85,17 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
 
                     if (response.body_type == CONTENT_LENGTH)
                     {
-                        if (try content_length = response.get_content_length())
+                        if (try content_length = response.get_content_length() && content_length == 0)
                         {
-                            if (content_length == 0)
-                            {
-                                self.state = COMPLETE;
-                                return COMPLETE;
-                            }
+                            self.state = COMPLETE;
+                            return COMPLETE;
                         }
                     }
                 }
 
-                break;
-
             case BODY:
                 HttpParserResult body = self.body_parser.step(byte, response)!;
                 if (body == COMPLETE) return COMPLETE;
-                break;
 
             case COMPLETE: return COMPLETE;
         }

@@ -63,12 +63,10 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
             }
 
             self.chunk_size_cache.append_char(byte);
-            break;
 
         case HEX_LF:
             assert_lf(byte)!;
             self.state = READ_CHUNK;
-            break;
 
         case READ_CHUNK:
             if (self.chunk_size > 0)
@@ -79,17 +77,14 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
             }
 
             self.state = CHUNK_LF;
-            break;
 
         case CHUNK_LF:
             assert_lf(byte)!;
             self.state = HEX_NUM;
-            break;
 
         case ZERO_HEX_LF:
             assert_lf(byte)!;
             self.state = DOUBLE_CR;
-            break;
 
         case EXTENSION:
             if (byte == CR)
@@ -110,6 +105,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
                     }
                 };
 
+                // TODO: For some reason, calling clear() causes UB access.
                 self.extensions_cache.free();
                 self.extensions_cache.init(self.allocator);
 
@@ -118,12 +114,10 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
             }
 
             self.extensions_cache.append_char(byte);
-            break;
 
         case DOUBLE_CR:
             assert_cr(byte)!;
             self.state = DOUBLE_LF;
-            break;
 
         case DOUBLE_LF:
             assert_lf(byte)!;

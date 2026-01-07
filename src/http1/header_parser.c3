@@ -53,17 +53,19 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             }
 
             self.header_key_cache.append_char(byte);
-            break;
 
         case HEADER_VALUE:
             // Handle incorrect ordering of CRLF.
             if (byte == LF) return MALFORMED_CRLF?;
             if (byte == CR)
             {
-                response.parse_and_set_kv(self.header_key_cache, self.header_val_cache)!;
+                String key = self.header_key_cache.str_view();
+                defer self.header_key_cache.clear();
 
-                self.header_key_cache.clear();
-                self.header_val_cache.clear();
+                String value = self.header_val_cache.str_view();
+                defer self.header_val_cache.clear();
+
+                response.parse_and_set_kv(key, value)!;
 
                 // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
                 // Transfer Encoding has precendence over Content-Length.
@@ -74,12 +76,10 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             }
 
             self.header_val_cache.append_char(byte);
-            break;
 
         case HEADER_LF:
             assert_lf(byte)!;
             self.state = HEADER_KEY;
-            break;
 
         case DOUBLE_LF:
             assert_lf(byte)!;

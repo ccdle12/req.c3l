@@ -107,7 +107,9 @@ fn void test_chunk_body_extensions() @test
         "4;ext1=val1;flag\r\n"
         "Wiki\r\n"
         "5;ext2=\"a;quoted\"value\";ext4=42\r\n"
-        "pedia\r\n";
+        "pedia\r\n"
+        "3;something;ext5=100fox;another;something2;ext6=bar;ext7=@!#$DSF\r\n"
+        "foo";
 
     @run_chunk_body_parser_test(input; ParserTestFixture* fixture, ChunkBodyParser* parser)
     {
@@ -118,9 +120,16 @@ fn void test_chunk_body_extensions() @test
         test::@check(*map.get_ref("ext2")!! == "\"a");
         test::@check(*map.get_ref("quoted\"value\"")!! == "quoted\"value\"");
         test::@check(*map.get_ref("ext4")!! == "42");
+        test::@check(*map.get_ref("something")!! == "something");
+        test::@check(*map.get_ref("ext5")!! == "100fox");
+        test::@check(*map.get_ref("another")!! == "another");
+        test::@check(*map.get_ref("something2")!! == "something2");
+        test::@check(*map.get_ref("ext6")!! == "bar");
+        test::@check(*map.get_ref("ext7")!! == "@!#$DSF");
 
         test::@check(fixture.response.body.str_view().contains("Wiki"));
         test::@check(fixture.response.body.str_view().contains("pedia"));
+        test::@check(fixture.response.body.str_view().contains("foo"));
     }!!;
 }
 
