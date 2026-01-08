@@ -36,7 +36,7 @@ fn void ChunkBodyParser.free(&self)
     self.extensions_cache.free();
 }
 
-fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* response) @dynamic
+fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
 {
     switch(self.state)
     {
@@ -71,7 +71,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
         case READ_CHUNK:
             if (self.chunk_size > 0)
             {
-                response.body.append_char(byte);
+                http_response.append_to_body(byte);
                 self.chunk_size--;
                 break;
             }
@@ -89,25 +89,8 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
         case EXTENSION:
             if (byte == CR)
             {
-                @pool()
-                {
-                    String[] split_extensions = self.extensions_cache
-                                                    .str_view()
-                                                    .tsplit(";");
-                    foreach (&ext : split_extensions)
-                    {
-                        String[] kv = ext.tsplit("=");
-
-                        String key = kv[0].trim().to_lower_tcopy();
-                        String value = (kv.len > 1) ? kv[1] : kv[0];
-
-                        response.extensions.set(key, value.trim());
-                    }
-                };
-
-                // TODO: For some reason, calling clear() causes UB access.
-                self.extensions_cache.free();
-                self.extensions_cache.init(self.allocator);
+                http_response.parse_and_set_extensions(self.extensions_cache.str_view());
+                defer self.extensions_cache.clear();
 
                 self.state = HEX_LF;
                 break;

@@ -12,6 +12,8 @@ const String HTTP11 = "HTTP/1.1";
 const String CONTENT_LENGTH_KEY = "content-length";
 const String TRANSFER_ENCODING_KEY = "transfer-encoding";
 
+const ulong DEFAULT_PAGE_SIZE = 16 * mem::KB;
+
 enum BodyType
 {
     NULL,
@@ -22,6 +24,8 @@ enum BodyType
 struct HttpResponse
 {
     Allocator allocator;
+    // Arena for owning Strings for Status Line, Headers and Extensions maps.
+    DynamicArenaAllocator owned_strings;
 
     // Status Line.
     String http_version;
@@ -40,6 +44,7 @@ struct HttpResponse
 fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
+    self.owned_strings.init(self.allocator, DEFAULT_PAGE_SIZE);
     self.headers.init(self.allocator);
     self.body.init(self.allocator, MAX_SIZE);
     self.extensions.init(self.allocator);
@@ -52,6 +57,7 @@ fn void HttpResponse.free(&self)
     self.headers.free();
     self.body.free();
     self.extensions.free();
+    self.owned_strings.free();
 }
 
 fn void? HttpResponse.parse_status_code(&self, String status_code)
@@ -60,13 +66,15 @@ fn void? HttpResponse.parse_status_code(&self, String status_code)
     self.status_code = status_code.to_integer(int, 10)!;
 }
 
-fn void? HttpResponse.parse_http_protocol(&self, String protocol)
+fn void? HttpResponse.parse_http_protocol(&self, String http_version)
 {
-    if (protocol != HTTP11 && protocol != HTTP10) return INVALID_PROTOCOL_VERSION?;
-    self.http_version = protocol;
+    if (http_version != HTTP11 && http_version != HTTP10) return INVALID_PROTOCOL_VERSION?;
+    self.http_version = http_version.copy(&self.owned_strings);
 }
 
-fn void? HttpResponse.parse_header(&self, String key)
+fn void HttpResponse.set_reason_phrase(&self, String reason) => self.reason_phrase = reason.copy(&self.owned_strings);
+
+fn void? HttpResponse.validate_header_key(&self, String key)
 {
     if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
 
@@ -76,21 +84,38 @@ fn void? HttpResponse.parse_header(&self, String key)
     }
 }
 
-fn void? HttpResponse.parse_and_set_kv(&self, String header_key, String header_value) => @pool()
+fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool()
 {
-    String key = header_key.to_lower_tcopy();
-    self.parse_header(key)!;
+    foreach (ext : extensions.tsplit(";"))
+    {
+        String[] kv = ext.tsplit("=");
 
-    String value = header_value.copy(self.allocator);
-    defer value.free(self.allocator);
+        String key = kv[0].trim().copy(&self.owned_strings);
+        String value = (kv.len > 1) ? kv[1].trim().copy(&self.owned_strings) : key;
 
-    self.headers.set(key.trim(), value.trim());
+        self.extensions.set(key, value);
+    };
 }
+
+fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
+{
+    self.validate_header_key(header_key)!;
+    String key = header_key.trim().to_lower_copy(&self.owned_strings);
+
+    String value = header_value.trim().copy(&self.owned_strings);
+    self.headers.set(key, value);
+}
+
+fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(byte);
 
 // TODO: This is naive setting for now, we need to be able to handle:
 // - compress
 // - deflate
 // - gzip
+<* According to RFC9112 6.1:
+   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
+   over Content-Length.
+*>
 fn void HttpResponse.set_body_type(&self)
 {
     if (self.headers.has_key(CONTENT_LENGTH_KEY))     self.body_type = CONTENT_LENGTH;
@@ -101,16 +126,6 @@ fn String*? HttpResponse.get_header_ref(&self, String key) => @pool()
 {
     String k = key.trim().to_lower_tcopy();
     return self.headers.get_ref(k);
-}
-
-<* According to RFC9112 6.1:
-   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
-   over Content-Length.
-*>
-fn void HttpResponse.parse_body_type(&self)
-{
-    if (try self.headers.get(CONTENT_LENGTH_KEY))     self.body_type = CONTENT_LENGTH;
-    if (try self.headers.get(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
 <*
