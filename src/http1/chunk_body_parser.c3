@@ -36,7 +36,7 @@ fn void ChunkBodyParser.free(&self)
     self.extensions_cache.free();
 }
 
-fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* response) @dynamic
+fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
 {
     switch(self.state)
     {
@@ -71,7 +71,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
         case READ_CHUNK:
             if (self.chunk_size > 0)
             {
-                response.append_to_body(byte);
+                http_response.append_to_body(byte);
                 self.chunk_size--;
                 break;
             }
@@ -89,7 +89,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* respon
         case EXTENSION:
             if (byte == CR)
             {
-                response.parse_and_set_extensions(self.extensions_cache.str_view());
+                http_response.parse_and_set_extensions(self.extensions_cache.str_view());
                 defer self.extensions_cache.clear();
 
                 self.state = HEX_LF;

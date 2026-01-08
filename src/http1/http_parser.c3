@@ -10,7 +10,7 @@ faultdef MALFORMED_CRLF;
 
 interface HttpStepParser
 {
-    fn HttpParserResult? step(char byte, HttpResponse* response);
+    fn HttpParserResult? step(char byte, HttpResponse* http_response);
 }
 
 enum HttpParserState
@@ -58,7 +58,7 @@ fn void HttpParser.free(&self)
    self.body_parser.free();
 }
 
-fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response)
+fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* http_response)
 {
     if (input.len == 0) return REQUEST_MORE;
     self.buf.write(input)!;
@@ -68,24 +68,24 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
         switch (self.state)
         {
             case STATUS_LINE:
-                HttpParserResult status_line = self.status_line_parser.step(byte, response)!;
+                HttpParserResult status_line = self.status_line_parser.step(byte, http_response)!;
                 if (status_line == COMPLETE) self.state = HEADER;
 
             case HEADER:
-                HttpParserResult header = self.header_parser.step(byte, response)!;
+                HttpParserResult header = self.header_parser.step(byte, http_response)!;
                 if (header == COMPLETE)
                 {
                     self.state = BODY;
 
-                    if (response.body_type == NULL)
+                    if (http_response.body_type == NULL)
                     {
                         self.state = COMPLETE;
                         return COMPLETE;
                     }
 
-                    if (response.body_type == CONTENT_LENGTH)
+                    if (http_response.body_type == CONTENT_LENGTH)
                     {
-                        if (try content_length = response.get_content_length() && content_length == 0)
+                        if (try content_length = http_response.get_content_length() && content_length == 0)
                         {
                             self.state = COMPLETE;
                             return COMPLETE;
@@ -94,7 +94,7 @@ fn HttpParserResult? HttpParser.step(&self, char[] input, HttpResponse* response
                 }
 
             case BODY:
-                HttpParserResult body = self.body_parser.step(byte, response)!;
+                HttpParserResult body = self.body_parser.step(byte, http_response)!;
                 if (body == COMPLETE) return COMPLETE;
 
             case COMPLETE: return COMPLETE;

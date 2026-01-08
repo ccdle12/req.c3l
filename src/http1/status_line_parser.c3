@@ -35,7 +35,7 @@ fn void StatusLineParser.free(&self)
    self.status_line_reason.free();
 }
 
-fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* response) @dynamic
+fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* http_response) @dynamic
 {
     switch(self.state)
     {
@@ -45,7 +45,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
                 String s = self.status_protocol_cache.str_view();
                 defer self.status_protocol_cache.clear();
 
-                response.parse_http_protocol(s)!;
+                http_response.parse_http_protocol(s)!;
 
                 self.state = STATUS_CODE;
                 break;
@@ -58,7 +58,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
             {
                 String s = self.status_code_cache.str_view();
                 defer self.status_code_cache.clear();
-                if (@catch(response.parse_status_code(s))) return INVALID_STATUS_CODE?;
+                if (@catch(http_response.parse_status_code(s))) return INVALID_STATUS_CODE?;
 
                 if (byte == CR) self.state = STATUS_LINE_LF;
                 if (byte == SP) self.state = OPTIONAL_REASON;
@@ -75,7 +75,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
         case OPTIONAL_REASON:
             if (byte == CR || byte == SP)
             {
-                response.set_reason_phrase(self.status_line_reason.str_view());
+                http_response.set_reason_phrase(self.status_line_reason.str_view());
                 self.state = STATUS_LINE_LF;
                 break;
             }

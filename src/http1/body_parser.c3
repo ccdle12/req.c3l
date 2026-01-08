@@ -16,15 +16,15 @@ fn void BodyParser.init(&self, Allocator allocator)
     self.content_length_body_parser.init();
 }
 
-fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* response) @dynamic
+fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
 {
-    switch(response.body_type)
+    switch(http_response.body_type)
     {
         case NULL: break;
         case CHUNKED:
-            return self.chunk_body_parser.step(byte, response)!;
+            return self.chunk_body_parser.step(byte, http_response)!;
         case CONTENT_LENGTH:
-            return self.content_length_body_parser.step(byte, response)!;
+            return self.content_length_body_parser.step(byte, http_response)!;
     }
 
     return COMPLETE;
