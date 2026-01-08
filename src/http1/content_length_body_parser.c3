@@ -29,7 +29,7 @@ fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse
             case READ_CONTENT:
                 if (self.content_length_read < content_length)
                 {
-                    response.body.append_char(byte);
+                    response.append_to_body(byte);
                     self.content_length_read++;
 
                     if (self.content_length_read == content_length)
