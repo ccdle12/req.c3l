@@ -1,72 +1,35 @@
 # Req C3
 
-## HTTP1
+An HTTP Library with basic Client/Server and CLI support, written in C3.
 
-- Adheres to RFC 9112: https://www.rfc-editor.org/rfc/rfc9112
+## Features
 
-### Parsing Headers Checklist
+This library will support:
 
-Task,Governing RFC,Section
+- HTTP/1.1 parsing, serialization and deserialization of Requests and Response
+- HTTP/2 framing
+- HTTP/3, WebSockets, and QUIC (planned)
+- Single-threaded HttpClient and HttpServer
 
-#### 1. Status Line, Line Termination and Structure
+## Dependencies
 
-- [x] "Verify HTTP Version, Status Code, Separators (Status Line)",RFC 9112, 4.1. Status Line
+- Current c3c version:
 
 ```
-Status-Line = HTTP-Version + SP + Status-Code + SP + Reason-Phrase + CRLF
+C3 Compiler Version:       0.7.8 (Pre-release, Dec 03 2025 13:47:36)
+Git Hash:                  ccffa03de29a531dbfbad69b977e8f96a6433733
+Backends:                  LLVM
+LLVM version:              19.1.6
 ```
 
-- [x] HTTP-Version must correctly parse protocol version `HTTP/1.1`, RFC9112, 4.1.
-- [x] Status Code must be valid 3 digits, non-digit characters or missing 3 digit character MUST return error, RFC 9110, 15
-- [x] Status Code must be converted to an integer value for semantic use
-- [x] Missing Status code MUST return error, RFC 723, 3.1.2
-- [x] Status Code must not be looked up against a list of known status codes to allow flexibility for future codes, RFC 723, 3.1.2
-- [x] Reason-Phrase Handling, the implementation should be robust enough to handle a missing Reason-Phrase or a Status-Line that ends after a status-code., RFC 9110, 4.1
-- [x] Status Line Termination (CRLF),RFC 7230,3.5. Message Framing
-- [x] Header Line Termination (CRLF),RFC 7230,3.5. Message Framing
-- [x] End of Headers (\r\n\r\n),RFC 7230,3.1. General Formatting / 3.5. Message Framing
+## Quick Start
 
-- [ ] Obsolete Folding (LWS) Rejection,RFC 7230,Appendix B. Obsolete Syntax / 3.2.4. Field Values
+- Run tests
 
----,---,---
+```
+c3c test
+```
 
-#### 2. Header Field-Name Validation (The tchar Rule)
+## Docs
 
-- [x] Check for Invalid Characters (tchar Rule),RFC 7230,3.2.6. Token and Quoted-String
-
-- [x] No Whitespace Between Header and Colon,RFC 9112, 5.4 Field Values
-
-- [x] Case In-sensitivity of Header Name,RFC 7230,3.2. Header Fields
-
----,---,---
-
-#### 3. Header Field-Value Validation
-
-- [x] Optional Whitespace (OWS) after Colon Stripping,RFC 7230,3.2.4. Field Values
-    - Basically remove any leading whitespace before the value and trailing whitespace at the end of the value
-
-- [ ] Server MUST reject any headers with a trailing whitespace on the field name before the colon, RFC 9112, 5.1, Field Line Parsing
-
-- [ ] Reject headers that contain CRLF in the fieldname, RFC 9112
-
-- [ ] "Valid Characters in Value (VCHAR, obs-text)",RFC 9112, 5.3, Field Values
-
-- [ ] Control Characters in Value,RFC 7230,3.2.4. Field Values
-
-- [ ] Trailing Whitespace Stripping,RFC 7230,3.2.4. Field Values
-
-- [ ] Prioritize Transfer-Encoding over Content-Length — RFC 7230 §3.3.3 (2014): "If a Transfer-Encoding header field is present and the chunked transfer coding is not the final encoding, the message framing is invalid. If Transfer-Encoding is present, Content-Length MUST be ignored."
-
----,---,---
-
-#### 4. Duplicate and Mandatory Fields
-
-- [ ] Identify & Handle Duplicates (Comma-Separated/Unique),RFC 7230,3.2.2. Field Order
-- [ ] "Check Mandatory Fields (e.g., Content-Length syntax)",RFC 7230,3.3. Message Body / 3.3.2. Content-Length
-
----,---,---
-
-## 5. Security and Robustness
-
-- [ ] Limit Header Count / Size - 16KB?, Not in RFCs, N/A
-- [ ] Handle Truncation,Not in RFCs,N/A
+- [http1 module feature list](./docs/http1_features.md)
