@@ -65,7 +65,7 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
                 String value = self.header_val_cache.str_view();
                 defer self.header_val_cache.clear();
 
-                response.parse_and_set_kv(key, value)!;
+                response.parse_and_set_header(key, value)!;
 
                 // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
                 // Transfer Encoding has precendence over Content-Length.
