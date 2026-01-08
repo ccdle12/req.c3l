@@ -44,6 +44,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
             {
                 String s = self.status_protocol_cache.str_view();
                 defer self.status_protocol_cache.clear();
+
                 response.parse_http_protocol(s)!;
 
                 self.state = STATUS_CODE;
@@ -74,7 +75,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* respo
         case OPTIONAL_REASON:
             if (byte == CR || byte == SP)
             {
-                response.reason_phrase = self.status_line_reason.str_view();
+                response.set_reason_phrase(self.status_line_reason.str_view());
                 self.state = STATUS_LINE_LF;
                 break;
             }
