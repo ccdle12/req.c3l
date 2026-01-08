@@ -2,7 +2,7 @@
   "langrev": "1",
   "warnings": [ "no-unused" ],
   "dependency-search-paths": [ "lib" ],
-  "dependencies": [ "tora" ],
+  "dependencies": [],
   "authors": [ "" ],
   "version": "0.1.0",
   "sources": [ "*", "src/http1/*", "test/http1/*" ],
