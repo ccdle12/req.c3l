@@ -1,12 +1,16 @@
 module req::http1;
 
 import std::collections::map;
+import std::collections::set;
 import std::collections::list;
+
+import std::io;
 
 faultdef INVALID_PROTOCOL_VERSION,
          INVALID_HEADER_KEY_SYMBOL,
          INVALID_STATUS_CODE,
-         INVALID_TRAILING_SPACE;
+         INVALID_TRAILING_SPACE,
+         MALFORMED_HEADER_DUPLICATE_SINGLETON;
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
@@ -14,6 +18,7 @@ const String CONTENT_LENGTH_KEY = "content-length";
 const String TRANSFER_ENCODING_KEY = "transfer-encoding";
 
 const ulong DEFAULT_PAGE_SIZE = 16 * mem::KB;
+
 
 enum BodyType
 {
@@ -34,7 +39,7 @@ struct HttpResponse
     String reason_phrase; // Optional according to RFC 9112.
 
     // Headers
-    LinkedHashMap{String, List{String}} headers;
+    LinkedHashMap{String, Header} headers;
 
     // Body
     HashMap{String, String} extensions;
@@ -75,16 +80,6 @@ fn void? HttpResponse.parse_http_protocol(&self, String http_version)
 
 fn void HttpResponse.set_reason_phrase(&self, String reason) => self.reason_phrase = reason.copy(&self.owned_strings);
 
-fn void? HttpResponse.validate_header_key(&self, String key)
-{
-    if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
-
-    foreach(c : key)
-    {
-        if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL?;
-    }
-}
-
 fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool()
 {
     foreach (ext : extensions.tsplit(";"))
@@ -100,22 +95,19 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
 
 fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
 {
-    self.validate_header_key(header_key)!;
-    String key = self.normalize_key(header_key, &self.owned_strings);
+    Header header;
+    header.init(&self.owned_strings);
+    header.set_header(header_key, header_value)!;
 
-    String value = header_value.trim().copy(&self.owned_strings);
+    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
 
-    if (try values = self.headers.get(key))
+    if (try cached_header = self.headers.get(header.key))
     {
-        values.push(value);
+        cached_header.push_value(header_value);
     }
     else
     {
-        List{String} values;
-        values.init(&self.owned_strings);
-        values.push(value);
-
-        self.headers.set(key, values);
+        self.headers.set(header.key, header);
     }
 }
 
@@ -139,7 +131,8 @@ fn String HttpResponse.normalize_key(&self, String key, Allocator allocator) => 
 
 fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
 {
-    return self.headers.get_ref(self.normalize_key(key, tmem));
+    Header* header = self.headers.get_ref(self.normalize_key(key, tmem))!;
+    return &header.values;
 }
 
 <*
