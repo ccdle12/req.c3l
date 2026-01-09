@@ -3,8 +3,6 @@ module req::http1;
 import std::collections::map;
 import std::collections::list;
 
-import std::io;
-
 faultdef INVALID_PROTOCOL_VERSION,
          INVALID_STATUS_CODE;
 
@@ -32,6 +30,7 @@ struct HttpResponse
 
     // Headers
     LinkedHashMap{String, Header} headers;
+    LinkedHashMap{String, List{String}} headers;
 
     // Body
     HashMap{String, String} extensions;
@@ -137,3 +136,5 @@ fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
     Header* header = self.headers.get_ref(self.normalize_key(key, tmem))!;
     return &header.values;
 }
+
+fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);
