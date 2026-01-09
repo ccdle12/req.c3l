@@ -16,8 +16,8 @@ enum ChunkBodyParserState
 struct ChunkBodyParser (HttpStepParser)
 {
     Allocator allocator;
-    ulong chunk_size;
     ChunkBodyParserState state;
+    ulong chunk_size;
     DString chunk_size_cache;
     DString extensions_cache;
 }

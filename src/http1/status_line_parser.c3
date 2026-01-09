@@ -16,9 +16,9 @@ struct StatusLineParser (HttpStepParser)
     Allocator allocator;
     StatusLineState state;
 
-    DString status_protocol_cache;
+    DString http_protocol_cache;
     DString status_code_cache;
-    DString status_line_reason;
+    DString optional_reason_cache;
 }
 
 fn void StatusLineParser.init(&self, Allocator allocator)
@@ -30,9 +30,9 @@ fn void StatusLineParser.init(&self, Allocator allocator)
 fn void StatusLineParser.free(&self)
 {
 
-   self.status_protocol_cache.free();
+   self.http_protocol_cache.free();
    self.status_code_cache.free();
-   self.status_line_reason.free();
+   self.optional_reason_cache.free();
 }
 
 fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* http_response) @dynamic
@@ -42,23 +42,23 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* http_
         case HTTP_VERSION:
             if (byte == SP)
             {
-                String s = self.status_protocol_cache.str_view();
-                defer self.status_protocol_cache.clear();
+                String http_protocol = self.http_protocol_cache.str_view();
+                defer self.http_protocol_cache.clear();
 
-                http_response.parse_http_protocol(s)!;
+                http_response.parse_http_protocol(http_protocol)!;
 
                 self.state = STATUS_CODE;
                 break;
             }
 
-            self.status_protocol_cache.append_char(byte);
+            self.http_protocol_cache.append_char(byte);
 
         case STATUS_CODE:
             if (byte == CR || byte == SP)
             {
-                String s = self.status_code_cache.str_view();
+                String status_code = self.status_code_cache.str_view();
                 defer self.status_code_cache.clear();
-                if (@catch(http_response.parse_status_code(s))) return INVALID_STATUS_CODE?;
+                if (@catch(http_response.parse_status_code(status_code))) return INVALID_STATUS_CODE?;
 
                 if (byte == CR) self.state = STATUS_LINE_LF;
                 if (byte == SP) self.state = OPTIONAL_REASON;
@@ -75,12 +75,13 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* http_
         case OPTIONAL_REASON:
             if (byte == CR || byte == SP)
             {
-                http_response.set_reason_phrase(self.status_line_reason.str_view());
+                http_response.set_reason_phrase(self.optional_reason_cache.str_view());
+                defer self.optional_reason_cache.clear();
                 self.state = STATUS_LINE_LF;
                 break;
             }
 
-            self.status_line_reason.append_char(byte);
+            self.optional_reason_cache.append_char(byte);
 
         case COMPLETE: return COMPLETE;
     }
