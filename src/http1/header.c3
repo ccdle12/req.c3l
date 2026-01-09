@@ -3,6 +3,8 @@ module req::http1;
 import std::collections::list;
 import std::collections::set;
 
+faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON;
+
 // Header Singleton Keys.
 const String AUTHORIZATION_KEY = "authorization";
 const String CONTENT_LOCATION_KEY = "content-location";
