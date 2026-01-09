@@ -3,7 +3,9 @@ module req::http1;
 import std::collections::list;
 import std::collections::set;
 
-faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON;
+faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON,
+         INVALID_HEADER_KEY_SYMBOL,
+         INVALID_TRAILING_SPACE;
 
 // Header Special Case Keys.
 const String CONTENT_LENGTH_KEY = "content-length";
@@ -121,7 +123,7 @@ fn void? Header.set_header(&self, String key, String value)
 {
     self.validate_header_key(key)!;
     self.key = self.normalize_key(key);
-    self.values.push(value.trim().copy(self.allocator));
+    self.push_value(value);
 
     if (is_singleton_header_key(self.key))    self.type = SINGLETON;
     if (is_special_case_header_key(self.key)) self.type = SPECIAL_CASE;

@@ -6,9 +6,7 @@ import std::collections::list;
 import std::io;
 
 faultdef INVALID_PROTOCOL_VERSION,
-         INVALID_HEADER_KEY_SYMBOL,
-         INVALID_STATUS_CODE,
-         INVALID_TRAILING_SPACE;
+         INVALID_STATUS_CODE;
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
