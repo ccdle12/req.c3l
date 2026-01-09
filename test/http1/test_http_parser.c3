@@ -161,6 +161,7 @@ fn void test_headers_without_double_crlf() @test
     @run_http_parser_test(input; HttpParser* parser, HttpParserResult* result, HttpResponse* response)
     {
         test::eq(*result, HttpParserResult.REQUEST_MORE);
+        test::eq(parser.state, HttpParserState.HEADER);
     }!!;
 }
 
