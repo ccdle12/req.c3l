@@ -139,12 +139,12 @@ fn void test_full_header() @test
     {
         test::eq(*result, HttpParserResult.REQUEST_MORE);
         test::@check(parser.buf_str_view().contains(input));
-        test::eq(*response.get_header_ref("access-control-allow-origin")!!, "*");
-        test::eq(*response.get_header_ref("content-type")!!, "application/json");
-        test::eq(*response.get_header_ref("date")!!, "Sat, 16 Aug 2025 21:48:49 GMT");
-        test::eq(*response.get_header_ref("vary")!!, "Accept-Encoding");
-        test::eq(*response.get_header_ref("via")!!, "1.1 Caddy");
-        test::eq(*response.get_header_ref("transfer-encoding")!!, "chunked");
+        test::eq((*response.get_header_ref("access-control-allow-origin")!!).get(0), "*");
+        test::eq((*response.get_header_ref("content-type")!!).get(0), "application/json");
+        test::eq((*response.get_header_ref("date")!!).get(0), "Sat, 16 Aug 2025 21:48:49 GMT");
+        test::eq((*response.get_header_ref("vary")!!).get(0), "Accept-Encoding");
+        test::eq((*response.get_header_ref("via")!!).get(0), "1.1 Caddy");
+        test::eq((*response.get_header_ref("transfer-encoding")!!).get(0), "chunked");
     }!!;
 }
 
