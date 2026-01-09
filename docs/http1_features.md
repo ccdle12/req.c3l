@@ -55,12 +55,15 @@ Status-Line = HTTP-Version + SP + Status-Code + SP + Reason-Phrase + CRLF
 
 - [ ] Prioritize Transfer-Encoding over Content-Length — RFC 7230 §3.3.3 (2014): "If a Transfer-Encoding header field is present and the chunked transfer coding is not the final encoding, the message framing is invalid. If Transfer-Encoding is present, Content-Length MUST be ignored."
 
+
 ---,---,---
 
 #### 4. Duplicate and Mandatory Fields
 
 - [ ] Identify & Handle Duplicates (Comma-Separated/Unique),RFC 7230,3.2.2. Field Order
 - [ ] "Check Mandatory Fields (e.g., Content-Length syntax)",RFC 7230,3.3. Message Body / 3.3.2. Content-Length
+- [ ] Reject any Singleton Headers that appear more than once TODO: RFC
+- [ ] Allow multiple Content-Length headers if the multiple values are byte for byte identical
 
 ---,---,---
 

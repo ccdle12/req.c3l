@@ -18,7 +18,7 @@ macro void? @run_content_length_body_parser_test(String input, ulong content_len
     value.tinit();
     value.appendf("%d", content_length);
 
-    fixture.response.headers.set(CONTENT_LENGTH_KEY, value.str_view());
+    fixture.response.parse_and_set_header(CONTENT_LENGTH_KEY, value.str_view())!!;
 
     fixture.parse(input)!!;
     @test_asserts(&fixture);
