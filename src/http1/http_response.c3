@@ -1,7 +1,6 @@
 module req::http1;
 
 import std::collections::map;
-import std::collections::set;
 import std::collections::list;
 
 import std::io;
@@ -13,11 +12,8 @@ faultdef INVALID_PROTOCOL_VERSION,
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
-const String CONTENT_LENGTH_KEY = "content-length";
-const String TRANSFER_ENCODING_KEY = "transfer-encoding";
 
 const ulong DEFAULT_PAGE_SIZE = 16 * mem::KB;
-
 
 enum BodyType
 {
@@ -29,8 +25,7 @@ enum BodyType
 struct HttpResponse
 {
     Allocator allocator;
-    // Arena for owning Strings for Status Line, Headers and Extensions maps.
-    DynamicArenaAllocator owned_strings;
+    DynamicArenaAllocator arena;
 
     // Status Line.
     String http_version;
@@ -49,7 +44,7 @@ struct HttpResponse
 fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
-    self.owned_strings.init(self.allocator, DEFAULT_PAGE_SIZE);
+    self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
     self.headers.init(self.allocator);
     self.body.init(self.allocator, MAX_SIZE);
     self.extensions.init(self.allocator);
@@ -62,7 +57,7 @@ fn void HttpResponse.free(&self)
     self.headers.free();
     self.body.free();
     self.extensions.free();
-    self.owned_strings.free();
+    self.arena.free();
 }
 
 fn void? HttpResponse.parse_status_code(&self, String status_code)
@@ -74,10 +69,10 @@ fn void? HttpResponse.parse_status_code(&self, String status_code)
 fn void? HttpResponse.parse_http_protocol(&self, String http_version)
 {
     if (http_version != HTTP11 && http_version != HTTP10) return INVALID_PROTOCOL_VERSION?;
-    self.http_version = http_version.copy(&self.owned_strings);
+    self.http_version = http_version.copy(&self.arena);
 }
 
-fn void HttpResponse.set_reason_phrase(&self, String reason) => self.reason_phrase = reason.copy(&self.owned_strings);
+fn void HttpResponse.set_reason_phrase(&self, String reason) => self.reason_phrase = reason.copy(&self.arena);
 
 fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool()
 {
@@ -85,8 +80,8 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
     {
         String[] kv = ext.tsplit("=");
 
-        String key = kv[0].trim().copy(&self.owned_strings);
-        String value = (kv.len > 1) ? kv[1].trim().copy(&self.owned_strings) : key;
+        String key = kv[0].trim().copy(&self.arena);
+        String value = (kv.len > 1) ? kv[1].trim().copy(&self.arena) : key;
 
         self.extensions.set(key, value);
     };
@@ -95,7 +90,7 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
 fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
 {
     Header header;
-    header.init(&self.owned_strings);
+    header.init(&self.arena);
     header.set_header(header_key, header_value)!;
 
     if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
