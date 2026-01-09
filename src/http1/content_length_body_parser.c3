@@ -20,20 +20,17 @@ fn void ContentLengthBodyParser.init(&self)
 
 fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
 {
-    if (!http_response.has_content_length()) return COMPLETE;
-
-    ulong content_length = http_response.get_content_length()!;
-    if (content_length == 0) return COMPLETE;
+    if (http_response.content_length == 0) return COMPLETE;
 
     switch(self.state)
     {
         case READ_CONTENT:
-            if (self.content_length_read < content_length)
+            if (self.content_length_read < http_response.content_length)
             {
                 http_response.append_to_body(byte);
                 self.content_length_read++;
 
-                if (self.content_length_read == content_length)
+                if (self.content_length_read == http_response.content_length)
                 {
                     self.state = COMPLETE;
                     return COMPLETE;

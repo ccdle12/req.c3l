@@ -35,6 +35,7 @@ struct HttpResponse
 
     // Body
     HashMap{String, String} extensions;
+    ulong content_length;
     BodyType body_type;
     DString body;
 }
@@ -44,6 +45,7 @@ fn void HttpResponse.init(&self, Allocator allocator)
     self.allocator = allocator;
     self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
     self.headers.init(self.allocator);
+    self.content_length = 0;
     self.body.init(self.allocator, MAX_SIZE);
     self.extensions.init(self.allocator);
 }
@@ -91,8 +93,10 @@ fn void? HttpResponse.parse_and_set_header(&self, String header_key, String head
     header.init(&self.arena);
     header.set_header(header_key, header_value)!;
 
+    // Handle duplicate singletons.
     if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
 
+    // Create or add to existing headers.
     if (try cached_header = self.headers.get(header.key))
     {
         cached_header.push_value(header_value);
@@ -101,11 +105,18 @@ fn void? HttpResponse.parse_and_set_header(&self, String header_key, String head
     {
         self.headers.set(header.key, header);
     }
+
+    // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
+    // Transfer Encoding has precendence over Content-Length.
+    self.set_body_type();
+
+    // Cache content-length for quicker access when parsing.
+    if (header.key == CONTENT_LENGTH_KEY) self.content_length = header_value.trim().to_integer(ulong)!;
 }
 
 fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(byte);
 
-// TODO: This is naive setting for now, we need to be able to handle:
+// TODO: This is a naive setting for now, we need to be able to handle:
 // - compress
 // - deflate
 // - gzip
@@ -126,14 +137,3 @@ fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
     Header* header = self.headers.get_ref(self.normalize_key(key, tmem))!;
     return &header.values;
 }
-
-<*
-  Returns the value of the content length header if it's available.
-*>
-fn ulong? HttpResponse.get_content_length(&self)
-{
-    List{String}* content_length = self.get_header_ref(CONTENT_LENGTH_KEY)!;
-    return content_length.get(0).to_integer(ulong);
-}
-
-fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);

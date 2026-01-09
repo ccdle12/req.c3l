@@ -67,10 +67,6 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
 
                 response.parse_and_set_header(key, value)!;
 
-                // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
-                // Transfer Encoding has precendence over Content-Length.
-                response.set_body_type();
-
                 self.state = HEADER_LF;
                 break;
             }
