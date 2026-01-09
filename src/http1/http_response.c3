@@ -30,7 +30,6 @@ struct HttpResponse
 
     // Headers
     LinkedHashMap{String, Header} headers;
-    LinkedHashMap{String, List{String}} headers;
 
     // Body
     HashMap{String, String} extensions;
