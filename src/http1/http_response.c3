@@ -1,6 +1,7 @@
 module req::http1;
 
 import std::collections::map;
+import std::collections::list;
 
 faultdef INVALID_PROTOCOL_VERSION,
          INVALID_HEADER_KEY_SYMBOL,
@@ -33,7 +34,7 @@ struct HttpResponse
     String reason_phrase; // Optional according to RFC 9112.
 
     // Headers
-    LinkedHashMap{String, String} headers;
+    LinkedHashMap{String, List{String}} headers;
 
     // Body
     HashMap{String, String} extensions;
@@ -100,10 +101,22 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
 fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
 {
     self.validate_header_key(header_key)!;
-    String key = header_key.trim().to_lower_copy(&self.owned_strings);
+    String key = self.normalize_key(header_key, &self.owned_strings);
 
     String value = header_value.trim().copy(&self.owned_strings);
-    self.headers.set(key, value);
+
+    if (try values = self.headers.get(key))
+    {
+        values.push(value);
+    }
+    else
+    {
+        List{String} values;
+        values.init(&self.owned_strings);
+        values.push(value);
+
+        self.headers.set(key, values);
+    }
 }
 
 fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(byte);
@@ -122,10 +135,11 @@ fn void HttpResponse.set_body_type(&self)
     if (self.headers.has_key(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
-fn String*? HttpResponse.get_header_ref(&self, String key) => @pool()
+fn String HttpResponse.normalize_key(&self, String key, Allocator allocator) => key.trim().to_lower_copy(allocator);
+
+fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
 {
-    String k = key.trim().to_lower_tcopy();
-    return self.headers.get_ref(k);
+    return self.headers.get_ref(self.normalize_key(key, tmem));
 }
 
 <*
@@ -133,6 +147,8 @@ fn String*? HttpResponse.get_header_ref(&self, String key) => @pool()
 *>
 fn ulong? HttpResponse.get_content_length(&self)
 {
-    String* content_length = self.get_header_ref(CONTENT_LENGTH_KEY)!;
-    return content_length.to_integer(ulong);
+    List{String}* content_length = self.get_header_ref(CONTENT_LENGTH_KEY)!;
+    return content_length.get(0).to_integer(ulong);
 }
+
+fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);
