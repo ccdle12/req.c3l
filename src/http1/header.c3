@@ -5,6 +5,10 @@ import std::collections::set;
 
 faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON;
 
+// Header Special Case Keys.
+const String CONTENT_LENGTH_KEY = "content-length";
+const String TRANSFER_ENCODING_KEY = "transfer-encoding";
+
 // Header Singleton Keys.
 const String AUTHORIZATION_KEY = "authorization";
 const String CONTENT_LOCATION_KEY = "content-location";
@@ -25,6 +29,15 @@ const String REFERER_KEY = "referer";
 const String RETRY_AFTER_KEY = "retry-after";
 const String SERVER_KEY = "server";
 const String USER_AGENT_KEY = "user-agent";
+
+fn HashSet{String} get_special_case_headers(Allocator allocator)
+{
+    HashSet{String} special_cases;
+    special_cases.init_with_values(allocator,
+                                   CONTENT_LENGTH_KEY,
+                                   TRANSFER_ENCODING_KEY);
+    return special_cases;
+}
 
 fn HashSet{String} get_singleton_headers_set(Allocator allocator)
 {
@@ -52,21 +65,34 @@ fn HashSet{String} get_singleton_headers_set(Allocator allocator)
     return singletons;
 }
 
-fn bool is_singleton_header_key(String key, Allocator allocator)
+fn bool is_singleton_header_key(String key) => @pool()
 {
-    HashSet{String} singletons = get_singleton_headers_set(allocator);
-    defer singletons.free();
-
+    HashSet{String} singletons = get_singleton_headers_set(tmem);
     return singletons.contains(key);
+}
+
+fn bool is_special_case_header_key(String key) => @pool()
+{
+    HashSet{String} special_cases = get_special_case_headers(tmem);
+    return special_cases.contains(key);
 }
 
 
 enum HeaderType
 {
     SINGLETON,
-    TMP,
+    SPECIAL_CASE,
 }
 
+<*
+ Represents an HTTP header field.
+
+ Assumptions and ownership:
+
+  - Each Header is allocated (and its strings/values are stored) from the HttpResponse arena.
+  - HttpResponse owns the arena and is responsible for freeing/resetting it.
+  - Header does not free its own arena-allocated memory.
+ *>
 struct Header
 {
     Allocator allocator;
@@ -81,12 +107,6 @@ fn void Header.init(&self, Allocator allocator)
     self.values.init(self.allocator);
 }
 
-fn void Header.free(&self)
-{
-    self.key.free(self.allocator);
-    self.values.free();
-}
-
 fn void? Header.validate_header_key(&self, String key)
 {
     if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
@@ -97,14 +117,15 @@ fn void? Header.validate_header_key(&self, String key)
     }
 }
 
-fn void? Header.set_header(&self, String key, String value) => @pool()
+fn void? Header.set_header(&self, String key, String value)
 {
     self.validate_header_key(key)!;
     self.key = self.normalize_key(key);
     self.values.push(value.trim().copy(self.allocator));
 
-    if (is_singleton_header_key(self.key, tmem)) self.type = SINGLETON;
+    if (is_singleton_header_key(self.key))    self.type = SINGLETON;
+    if (is_special_case_header_key(self.key)) self.type = SPECIAL_CASE;
 }
 
-fn void Header.push_value(&self, String value) => self.values.push(value.trim().copy(self.allocator));
+fn void Header.push_value(&self, String value)    => self.values.push(value.trim().copy(self.allocator));
 fn String Header.normalize_key(&self, String key) => key.trim().to_lower_copy(self.allocator);
