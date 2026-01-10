@@ -4,7 +4,8 @@ import std::collections::map;
 import std::collections::list;
 
 faultdef INVALID_PROTOCOL_VERSION,
-         INVALID_STATUS_CODE;
+         INVALID_STATUS_CODE,
+         MALFORMED_DUPLICATE_CONTENT_LENGTH;
 
 const String HTTP10 = "HTTP/1.0";
 const String HTTP11 = "HTTP/1.1";
@@ -29,7 +30,7 @@ struct HttpResponse
     String reason_phrase; // Optional according to RFC 9112.
 
     // Headers
-    LinkedHashMap{String, Header} headers;
+    HttpHeaders headers;
 
     // Body
     HashMap{String, String} extensions;
@@ -85,31 +86,30 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
     };
 }
 
+<*
+ Parse a single header (key and raw value), enforce header-specific rules, and
+ either append its value to an existing header entry or copy the parsed header
+ into the response arena.
+ *>
 fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
 {
-    Header header;
-    header.init(&self.arena);
-    header.set_header(header_key, header_value)!;
+    Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
 
-    // Handle duplicate singletons.
-    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
-
-    // Create or add to existing headers.
-    if (try cached_header = self.headers.get(header.key))
-    {
-        cached_header.push_value(header_value);
-    }
-    else
-    {
-        self.headers.set(header.key, header);
-    }
+    // Cache the content length if applicable.
+    self.try_cache_content_length(header)!;
 
     // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
     // Transfer Encoding has precendence over Content-Length.
     self.set_body_type();
+}
 
-    // Cache content-length for quicker access when parsing.
-    if (header.key == CONTENT_LENGTH_KEY) self.content_length = header_value.trim().to_integer(ulong)!;
+<*
+ Caches the content length in th HttpResponse for quicker access if header is a
+ `content-length`.
+ *>
+fn void? HttpResponse.try_cache_content_length(&self, Header* header) @private
+{
+    if (header.key == CONTENT_LENGTH_KEY) self.content_length = header.values.get(0).to_integer(ulong)!;
 }
 
 fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(byte);
@@ -118,9 +118,10 @@ fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(b
 // - compress
 // - deflate
 // - gzip
-<* According to RFC9112 6.1:
-   There is a priortiy rule that emphasizes that Transfer-Encoding has precedence
-   over Content-Length.
+<*
+   Determine and set the response's body framing type based on received headers,
+   applying the precedence rule from RFC 9112 §6.1 - Transfer-Encoding has precedence
+   over Content-Length
 *>
 fn void HttpResponse.set_body_type(&self)
 {
@@ -128,12 +129,5 @@ fn void HttpResponse.set_body_type(&self)
     if (self.headers.has_key(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
-fn String HttpResponse.normalize_key(&self, String key, Allocator allocator) => key.trim().to_lower_copy(allocator);
-
-fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
-{
-    Header* header = self.headers.get_ref(self.normalize_key(key, tmem))!;
-    return &header.values;
-}
-
+fn List{String}*? HttpResponse.get_header_ref(&self, String key) => &self.headers.get_ref(key)!.values;
 fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);

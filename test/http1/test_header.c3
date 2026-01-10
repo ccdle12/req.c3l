@@ -24,5 +24,24 @@ fn void test_setting_special_case_headers() @test
 
         test::eq(header.type, HeaderType.SPECIAL_CASE);
     };
+}
 
+fn void test_header_copy() @test
+{
+    Header header;
+    header.init(tmem);
+    header.set_header("CONTENT-LENGTH", "foo")!!;
+
+    test::eq(header.type, HeaderType.SPECIAL_CASE);
+    test::eq(header.key, "content-length");
+    test::eq(header.values.len(), 1);
+
+    Header copy = header.copy(tmem);
+    test::eq(header.type, copy.type);
+    test::eq(header.key, copy.key);
+    test::@check(header.values.equals(copy.values));
+
+    header.push_value("bar");
+    test::eq(header.values.len(), 2);
+    test::@check(!header.values.equals(copy.values));
 }
