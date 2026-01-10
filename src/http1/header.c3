@@ -131,3 +131,19 @@ fn void? Header.set_header(&self, String key, String value)
 
 fn void Header.push_value(&self, String value)    => self.values.push(value.trim().copy(self.allocator));
 fn String Header.normalize_key(&self, String key) => key.trim().to_lower_copy(self.allocator);
+
+fn Header Header.copy(&self, Allocator allocator)
+{
+    Header copy;
+    copy.init(allocator);
+
+    copy.key = self.key.copy(allocator);
+    foreach (&value : self.values)
+    {
+        String value_copy = value.copy(allocator);
+        copy.values.push(value_copy);
+    }
+    copy.type = self.type;
+
+    return copy;
+}
