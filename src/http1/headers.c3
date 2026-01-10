@@ -80,6 +80,7 @@ fn bool is_special_case_header_key(String key) => @pool()
     return special_cases.contains(key);
 }
 
+
 struct HttpHeaders
 {
     Allocator allocator;
@@ -175,6 +176,15 @@ enum HeaderType
 {
     SINGLETON,
     SPECIAL_CASE,
+    // TODO: TMP until we really need to distinguish between comma-separated and multi line.
+    MULTI_VALUE,
+}
+
+fn HeaderType get_header_type(String key)
+{
+    if (is_singleton_header_key(key))    return SINGLETON;
+    if (is_special_case_header_key(key)) return SPECIAL_CASE;
+    return MULTI_VALUE;
 }
 
 <*
@@ -215,9 +225,7 @@ fn void? Header.set_header(&self, String key, String value)
     self.validate_header_key(key)!;
     self.key = normalize_key(self.allocator, key);
     self.push_value(value);
-
-    if (is_singleton_header_key(self.key))    self.type = SINGLETON;
-    if (is_special_case_header_key(self.key)) self.type = SPECIAL_CASE;
+    self.type = get_header_type(self.key);
 }
 
 fn void Header.push_value(&self, String value) => self.values.push(value.trim().copy(self.allocator));
