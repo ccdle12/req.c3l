@@ -30,7 +30,7 @@ struct HttpResponse
     String reason_phrase; // Optional according to RFC 9112.
 
     // Headers
-    LinkedHashMap{String, Header} headers;
+    HttpHeaders headers;
 
     // Body
     HashMap{String, String} extensions;
@@ -91,64 +91,16 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
  either append its value to an existing header entry or copy the parsed header
  into the response arena.
  *>
-fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value) => @pool()
+fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
 {
-    Header header = self.new_header_and_enforce_rules(tmem, header_key, header_value)!;
+    Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
 
-    if (try cached_header = self.headers.get(header.key))
-    {
-        // Enforcement of duplicate header value MUST use the pre-normalized header value.
-        self.enforce_content_length_special_case(&cached_header, header_value)!;
-
-        String additional_value = header.values.get(0).copy(&self.arena);
-        cached_header.push_value(additional_value);
-    }
-    else
-    {
-        Header arena_header = header.copy(&self.arena);
-        self.headers.set(arena_header.key, arena_header);
-    }
+    // Cache the content length if applicable.
+    self.try_cache_content_length(header)!;
 
     // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
     // Transfer Encoding has precendence over Content-Length.
     self.set_body_type();
-}
-
-<*
- Creates a new header while validating the header rules on header types (e.g. SINGLETON etc...).
- *>
-fn Header? HttpResponse.new_header_and_enforce_rules(&self, Allocator allocator, String header_key, String header_value) @private
-{
-    Header header;
-    header.init(allocator);
-    header.set_header(header_key, header_value)!;
-
-    self.enforce_duplicate_singleton_case(&header)!;
-    self.try_cache_content_length(&header)!;
-
-    return header;
-}
-
-<*
- Enforces the single-instance constraint implied by header semantics per RFC 9112 (HTTP/1.1) §5.3
- and related header field definitions — duplicate instances of headers that are not allowed to appear
- multiple times should be treated as malformed.
- *>
-fn void? HttpResponse.enforce_duplicate_singleton_case(&self, Header* header) @private
-{
-    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
-}
-
-<*
- Validate duplicate Content-Length header values per RFC 9112 section 6.3 (and RFC 7230 §3.3.2 behavior),
- ensuring multiple Content-Length headers are either identical or rejected.
-*>
-fn void? HttpResponse.enforce_content_length_special_case(&self, Header* header, String pre_normalized_value) @private
-{
-    if (header.key == CONTENT_LENGTH_KEY && pre_normalized_value != header.values.get(0))
-    {
-        return MALFORMED_DUPLICATE_CONTENT_LENGTH?;
-    }
 }
 
 <*
@@ -157,7 +109,6 @@ fn void? HttpResponse.enforce_content_length_special_case(&self, Header* header,
  *>
 fn void? HttpResponse.try_cache_content_length(&self, Header* header) @private
 {
-
     if (header.key == CONTENT_LENGTH_KEY) self.content_length = header.values.get(0).to_integer(ulong)!;
 }
 
@@ -178,12 +129,5 @@ fn void HttpResponse.set_body_type(&self)
     if (self.headers.has_key(TRANSFER_ENCODING_KEY))  self.body_type = CHUNKED;
 }
 
-fn String HttpResponse.normalize_key(&self, String key, Allocator allocator) => key.trim().to_lower_copy(allocator);
-
-fn List{String}*? HttpResponse.get_header_ref(&self, String key) => @pool()
-{
-    Header* header = self.headers.get_ref(self.normalize_key(key, tmem))!;
-    return &header.values;
-}
-
+fn List{String}*? HttpResponse.get_header_ref(&self, String key) => &self.headers.get_ref(key)!.values;
 fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);

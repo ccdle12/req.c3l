@@ -1,6 +1,7 @@
 module req::http1;
 
 import std::collections::list;
+import std::collections::map;
 import std::collections::set;
 
 faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON,
@@ -79,6 +80,96 @@ fn bool is_special_case_header_key(String key) => @pool()
     return special_cases.contains(key);
 }
 
+struct HttpHeaders
+{
+    Allocator allocator;
+    DynamicArenaAllocator arena;
+    LinkedHashMap{String, Header} headers;
+}
+
+fn void HttpHeaders.init(&self, Allocator allocator)
+{
+    self.allocator = allocator;
+    self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
+    self.headers.init(self.allocator);
+}
+
+fn void HttpHeaders.free(&self)
+{
+    self.arena.free();
+    self.headers.free();
+}
+
+fn Header*? HttpHeaders.get_ref(&self, String key) => @pool()
+{
+    return self.headers.get_ref(normalize_key(tmem, key));
+}
+
+fn bool HttpHeaders.has_key(&self, String key) => self.headers.has_key(key);
+
+fn Header*? HttpHeaders.push_and_get_header_ref(&self, String header_key, String header_value)
+{
+    self.push(header_key, header_value)!;
+    return self.get_ref(header_key);
+}
+
+<*
+ Creates a new header while validating the header rules on header types (e.g. SINGLETON etc...).
+ *>
+fn void? HttpHeaders.push(&self, String header_key, String header_value) => @pool()
+{
+    Header header = self.new_header_and_enforce_rules(tmem, header_key, header_value)!;
+
+    if (try cached_header = self.headers.get_ref(header.key))
+    {
+        // Enforcement of duplicate header value MUST use the pre-normalized header value.
+        self.enforce_content_length_special_case(cached_header, header_value)!;
+
+        String additional_value = header.values.get(0).copy(&self.arena);
+        cached_header.push_value(additional_value);
+    }
+    else
+    {
+        Header arena_header = header.copy(&self.arena);
+        self.headers.set(arena_header.key, arena_header);
+    }
+}
+
+<*
+ Creates a new header while validating the header rules on header types (e.g. SINGLETON etc...).
+ *>
+fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, String header_key, String header_value) @private
+{
+    Header header;
+    header.init(allocator);
+    header.set_header(header_key, header_value)!;
+
+    self.enforce_duplicate_singleton_case(&header)!;
+
+    return header;
+}
+
+<*
+ Enforces the single-instance constraint implied by header semantics per RFC 9112 (HTTP/1.1) §5.3
+ and related header field definitions — duplicate instances of headers that are not allowed to appear
+ multiple times should be treated as malformed.
+ *>
+fn void? HttpHeaders.enforce_duplicate_singleton_case(&self, Header* header) @private
+{
+    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
+}
+
+<*
+ Validate duplicate Content-Length header values per RFC 9112 section 6.3 (and RFC 7230 §3.3.2 behavior),
+ ensuring multiple Content-Length headers are either identical or rejected.
+*>
+fn void? HttpHeaders.enforce_content_length_special_case(&self, Header* header, String pre_normalized_value) @private
+{
+    if (header.key == CONTENT_LENGTH_KEY && pre_normalized_value != header.values.get(0))
+    {
+        return MALFORMED_DUPLICATE_CONTENT_LENGTH?;
+    }
+}
 
 enum HeaderType
 {
@@ -91,9 +182,9 @@ enum HeaderType
 
  Assumptions and ownership:
 
-  - Each Header is allocated (and its strings/values are stored) from the HttpResponse arena.
-  - HttpResponse owns the arena and is responsible for freeing/resetting it.
-  - Header does not free its own arena-allocated memory.
+  - Each Header is allocated (and its strings/values are stored) in the Headers arena.
+  - Headers owns the arena and is responsible for freeing/resetting it.
+  - Header does not free its own allocated memory.
  *>
 struct Header
 {
@@ -122,15 +213,14 @@ fn void? Header.validate_header_key(&self, String key)
 fn void? Header.set_header(&self, String key, String value)
 {
     self.validate_header_key(key)!;
-    self.key = self.normalize_key(key);
+    self.key = normalize_key(self.allocator, key);
     self.push_value(value);
 
     if (is_singleton_header_key(self.key))    self.type = SINGLETON;
     if (is_special_case_header_key(self.key)) self.type = SPECIAL_CASE;
 }
 
-fn void Header.push_value(&self, String value)    => self.values.push(value.trim().copy(self.allocator));
-fn String Header.normalize_key(&self, String key) => key.trim().to_lower_copy(self.allocator);
+fn void Header.push_value(&self, String value) => self.values.push(value.trim().copy(self.allocator));
 
 fn Header Header.copy(&self, Allocator allocator)
 {
