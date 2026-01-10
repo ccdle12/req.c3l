@@ -49,3 +49,5 @@ fn void? assert_cr(char c)
 {
     if (c != CR) return MALFORMED_CRLF?;
 }
+
+fn String normalize_key(Allocator allocator, String key) => key.trim().to_lower_copy(allocator);
