@@ -2,7 +2,7 @@ module req::http1;
 
 import std::io;
 
-enum SameSite : char (String name)
+enum SameSite : (String name)
 {
     // Cookies are only sent in the first party context, will not be included
     // in third party requests.
@@ -30,12 +30,12 @@ faultdef MALFORMED_COOKIE_MISSING_NAME,
          MALFORMED_COOKIE_INVALID_CHAR,
          MALFORMED_EMPTY_COOKIE,
          MALFORMED_COOKIE_INVALID_SAMESITE,
-         MALFORMED_COOKIE_MISSING_SECURE_FLAG;
+         MALFORMED_COOKIE_MISSING_SECURE_FLAG,
+         MALFORMED_COOKIE_INVALID_EXPIRY_DATE;
 
 struct Cookie
 {
     Allocator allocator;
-// TODO: enforce setting sameSite and secure flag
 
     // Cookie identifier - must appear first.
     String name;
@@ -83,12 +83,6 @@ fn void Cookie.clear(&self)
     self.same_site = SameSite.LAX;
 }
 
-// TODO: cookie/names can have duplicates but the key is the name, if the name already
-// exists, overwrite it, (remember to clear it first)
-// - Do this in a Cookies struct.
-
-
-// TODO: Should either split into sub functions or create a step parser.
 fn void? Cookie.parse_str(&self, String value) => @pool()
 {
     if (value.len < 1) return MALFORMED_EMPTY_COOKIE?;
@@ -154,6 +148,8 @@ fn void? Cookie.parse_str(&self, String value) => @pool()
             if (tnormalize_key(key) == "expires")
             {
                 self.expires_raw = attr.trim().copy(self.allocator);
+                bool result = validate_http_date_time(self.expires_raw) ?? MALFORMED_COOKIE_INVALID_EXPIRY_DATE?!;
+                if (!result) return MALFORMED_COOKIE_INVALID_EXPIRY_DATE?;
             }
 
             if (tnormalize_key(key) == "max-age")

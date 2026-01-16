@@ -97,6 +97,7 @@ fn void test_with_allocator() @test
       "access-control-allow-origin: *\r\n"
       "content-type: application/json \r\n"
       "set-cookie: NID=99=YsDT5i3E-CXax-; expires=Wed, 23-Nov-2011 01:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict \r\n"
+      "Set-Cookie: foo=bar; expires=Wed, 23-Nov-2011 01:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict \r\n"
       "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
       "vary: Accept-Encoding \r\n"
       "via: 1.1 Caddy \r\n"

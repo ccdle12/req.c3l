@@ -173,5 +173,23 @@ fn void test_none_requirement_with_secure_flag() @test
     cookie.tinit();
 
     test::eq(@catch(cookie.parse_str("cookie=attribute; SameSite=none")), MALFORMED_COOKIE_MISSING_SECURE_FLAG);
+}
+
+fn void test_invalid_expiry_date() @test
+{
+    Cookie cookie;
+    cookie.tinit();
+
+    String[*] inputs = {
+        "NID=99=YsDT5i3E-CXax-; expires=Wed,23-Nov-2011 01:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict",
+        "NID=99=YsDT5i3E-CXax-; expires=Wed, 31-Nov-2011 01:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict",
+        "NID=99=YsDT5i3E-CXax-; expires=foo, 30-Nov-2011 01:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict",
+        "NID=99=YsDT5i3E-CXax-; expires=fri, 30-Nov-2011 24:05:03 GMT; path=/; domain=.google.ch; HttpOnly; Max-Age=3600; Secure; SameSite=Strict",
+    };
+
+    foreach (input : inputs)
+    {
+        test::eq(@catch(cookie.parse_str(input)), MALFORMED_COOKIE_INVALID_EXPIRY_DATE);
+    }
 
 }
