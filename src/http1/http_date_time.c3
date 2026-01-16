@@ -3,6 +3,69 @@ module req::http1;
 import std::collections::set;
 import std::time;
 
+struct MonthIterator
+{
+    Month[12] months;
+    usz idx;
+    Month current;
+}
+
+fn void MonthIterator.init(&self)
+{
+    self.months =
+    {
+        JANUARY,
+        FEBRUARY,
+        MARCH,
+        APRIL,
+        MAY,
+        JUNE,
+        JULY,
+        AUGUST,
+        SEPTEMBER,
+        OCTOBER,
+        NOVEMBER,
+        DECEMBER
+    };
+
+    self.current = JANUARY;
+    self.idx = 0;
+}
+
+fn void MonthIterator.next(&self)
+{
+    if (self.idx > self.months.len - 1) return;
+    self.idx++;
+    self.current = self.months[self.idx];
+}
+
+macro void MonthIterator.@foreach(&self, ; @body(Month month))
+{
+    while (self.idx < self.months.len - 1)
+    {
+        @body(self.current);
+        self.next();
+    }
+}
+
+fn Month match_month(String input) => @pool()
+{
+    Month result;
+    MonthIterator iter;
+    iter.init();
+
+    iter.@foreach(; Month month)
+    {
+        if (tnormalize_key(input) == tnormalize_key(iter.current.abbrev))
+        {
+            result = iter.current;
+        }
+    };
+
+
+    return result;
+}
+
 fn HashSet{String} get_week_days(Allocator allocator)
 {
     HashSet{String} week_days;
@@ -17,42 +80,18 @@ fn HashSet{String} get_week_days(Allocator allocator)
     return week_days;
 }
 
-fn HashSet{String} get_months(Allocator allocator)
+fn bool is_valid_month(String month_str) => @pool()
 {
-    HashSet{String} months;
-    months.init_with_values(allocator,
-                                normalize_key(allocator, Month.JANUARY.abbrev),
-                                normalize_key(allocator, Month.FEBRUARY.abbrev),
-                                normalize_key(allocator, Month.MARCH.abbrev),
-                                normalize_key(allocator, Month.APRIL.abbrev),
-                                normalize_key(allocator, Month.MAY.abbrev),
-                                normalize_key(allocator, Month.JUNE.abbrev),
-                                normalize_key(allocator, Month.JULY.abbrev),
-                                normalize_key(allocator, Month.AUGUST.abbrev),
-                                normalize_key(allocator, Month.SEPTEMBER.abbrev),
-                                normalize_key(allocator, Month.OCTOBER.abbrev),
-                                normalize_key(allocator, Month.NOVEMBER.abbrev),
-                                normalize_key(allocator, Month.DECEMBER.abbrev));
-    return months;
-}
+    bool result = false;
 
-fn Month match_month(String input) => @pool()
-{
-    Month month;
-    if (tnormalize_key(input) == tnormalize_key(Month.JANUARY.abbrev)) month = JANUARY;
-    if (tnormalize_key(input) == tnormalize_key(Month.FEBRUARY.abbrev)) month = FEBRUARY;
-    if (tnormalize_key(input) == tnormalize_key(Month.MARCH.abbrev)) month = MARCH;
-    if (tnormalize_key(input) == tnormalize_key(Month.APRIL.abbrev)) month = APRIL;
-    if (tnormalize_key(input) == tnormalize_key(Month.MAY.abbrev)) month = MAY;
-    if (tnormalize_key(input) == tnormalize_key(Month.JUNE.abbrev)) month = JUNE;
-    if (tnormalize_key(input) == tnormalize_key(Month.JULY.abbrev)) month = JULY;
-    if (tnormalize_key(input) == tnormalize_key(Month.AUGUST.abbrev)) month = AUGUST;
-    if (tnormalize_key(input) == tnormalize_key(Month.SEPTEMBER.abbrev)) month = SEPTEMBER;
-    if (tnormalize_key(input) == tnormalize_key(Month.OCTOBER.abbrev)) month = OCTOBER;
-    if (tnormalize_key(input) == tnormalize_key(Month.NOVEMBER.abbrev)) month = NOVEMBER;
-    if (tnormalize_key(input) == tnormalize_key(Month.DECEMBER.abbrev)) month = DECEMBER;
+    MonthIterator month_iter;
+    month_iter.init();
+    month_iter.@foreach(; Month month)
+    {
+        if (tnormalize_key(month_str) == tnormalize_key(month.abbrev)) result = true;
+    };
 
-    return month;
+    return result;
 }
 
 fn bool? validate_http_date_time(String date_time) => @pool()
@@ -69,18 +108,16 @@ fn bool? validate_http_date_time(String date_time) => @pool()
 
         // Date: <day>-<month>-<year>
         uint day_num = date_time[5..6].to_integer(uint)!;
-        if (day_num > 31) return false;
         if (date_time[7] != '-') return false;
 
-        String month_str = tnormalize_key(date_time[8..10]);
-        if (!get_months(tmem).contains(month_str)) return false;
+        String month_str = date_time[8..10];
+        if (!is_valid_month(month_str)) return false;
 
         Month month = match_month(month_str);
         if (day_num > month.days) return false;
 
         if (date_time[11] != '-') return false;
 
-        // TODO: Is there a minimum year and maximum year?
         uint year = date_time[13..15].to_integer(uint)!;
         if (date_time[16] != SP) return false;
 
