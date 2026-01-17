@@ -51,3 +51,4 @@ fn void? assert_cr(char c)
 }
 
 fn String normalize_key(Allocator allocator, String key) => key.trim().to_lower_copy(allocator);
+fn String tnormalize_key(String key) => key.trim().to_lower_tcopy();

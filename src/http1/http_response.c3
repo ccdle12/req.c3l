@@ -91,8 +91,14 @@ fn void HttpResponse.parse_and_set_extensions(&self, String extensions) => @pool
  either append its value to an existing header entry or copy the parsed header
  into the response arena.
  *>
-fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value)
+fn void? HttpResponse.parse_and_set_header(&self, String header_key, String header_value) => @pool()
 {
+    if (tnormalize_key(header_key) == SET_COOKIE)
+    {
+        self.headers.set_cookie(header_value)!;
+        return;
+    }
+
     Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
 
     // Cache the content length if applicable.

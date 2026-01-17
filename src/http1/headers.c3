@@ -12,6 +12,9 @@ faultdef MALFORMED_HEADER_DUPLICATE_SINGLETON,
 const String CONTENT_LENGTH_KEY = "content-length";
 const String TRANSFER_ENCODING_KEY = "transfer-encoding";
 
+// Cookie Header.
+const String SET_COOKIE = "set-cookie";
+
 // Header Singleton Keys.
 const String AUTHORIZATION_KEY = "authorization";
 const String CONTENT_LOCATION_KEY = "content-location";
@@ -85,6 +88,8 @@ struct HttpHeaders
 {
     Allocator allocator;
     DynamicArenaAllocator arena;
+
+    LinkedHashMap{String, Cookie} cookies;
     LinkedHashMap{String, Header} headers;
 }
 
@@ -93,12 +98,14 @@ fn void HttpHeaders.init(&self, Allocator allocator)
     self.allocator = allocator;
     self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
     self.headers.init(self.allocator);
+    self.cookies.init(self.allocator);
 }
 
 fn void HttpHeaders.free(&self)
 {
     self.arena.free();
     self.headers.free();
+    self.cookies.free();
 }
 
 fn Header*? HttpHeaders.get_ref(&self, String key) => @pool()
@@ -112,6 +119,15 @@ fn Header*? HttpHeaders.push_and_get_header_ref(&self, String header_key, String
 {
     self.push(header_key, header_value)!;
     return self.get_ref(header_key);
+}
+
+fn void? HttpHeaders.set_cookie(&self, String cookie_value)
+{
+    Cookie cookie;
+    cookie.init(&self.arena);
+    cookie.parse_str(cookie_value)!;
+
+    self.cookies.set(cookie.name, cookie);
 }
 
 <*
