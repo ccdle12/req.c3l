@@ -4,7 +4,7 @@ import std::io;
 
 fn void test_validate_http_date_time() @test
 {
-    test::@check(validate_http_date_time("Wed, 23-Nov-2011 01:05:03 GMT")!!);
+    test::@check(validate_http_date_time("Wed, 23-Nov-2011 01:05:03 GMT"));
 }
 
 fn void test_invalid_http_date_time() @test
@@ -26,5 +26,5 @@ fn void test_invalid_http_date_time() @test
         "Wed, 29-Feb-2011 01:00:00 GMT",
     };
 
-    foreach (input : inputs) test::@check(!validate_http_date_time(input)!!);
+    foreach (input : inputs) test::@check(!validate_http_date_time(input));
 }

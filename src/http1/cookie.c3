@@ -1,6 +1,7 @@
 module req::http1;
 
 import std::io;
+import std::time;
 
 enum SameSite : (String name)
 {
@@ -54,6 +55,7 @@ struct Cookie
 
     // TODO: - Whats the difference between expires and max_age?
     String expires_raw;
+    DateTime expires;
     // TODO: - Create a date time object for expires.
 
     // The cookie must only be sent over HTTPS - optional.
@@ -148,8 +150,8 @@ fn void? Cookie.parse_str(&self, String value) => @pool()
             if (tnormalize_key(key) == "expires")
             {
                 self.expires_raw = attr.trim().copy(self.allocator);
-                bool result = validate_http_date_time(self.expires_raw) ?? MALFORMED_COOKIE_INVALID_EXPIRY_DATE?!;
-                if (!result) return MALFORMED_COOKIE_INVALID_EXPIRY_DATE?;
+                self.expires = parse_and_get_date_time(self.expires_raw) ?? MALFORMED_COOKIE_INVALID_EXPIRY_DATE?!;
+
             }
 
             if (tnormalize_key(key) == "max-age")

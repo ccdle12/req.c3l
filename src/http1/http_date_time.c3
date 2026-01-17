@@ -2,6 +2,7 @@ module req::http1;
 
 import std::collections::set;
 import std::time;
+import std::time::datetime;
 
 struct MonthIterator
 {
@@ -80,6 +81,11 @@ fn HashSet{String} get_week_days(Allocator allocator)
     return week_days;
 }
 
+fn bool is_week_day(String day) => @pool()
+{
+    return get_week_days(tmem).contains(day);
+}
+
 fn bool is_valid_month(String month_str) => @pool()
 {
     bool result = false;
@@ -94,7 +100,24 @@ fn bool is_valid_month(String month_str) => @pool()
     return result;
 }
 
-fn bool? validate_http_date_time(String date_time) => @pool()
+faultdef INVALID_DATE_TIME;
+
+fn DateTime? parse_and_get_date_time(String date_time) => @pool()
+{
+    if (!validate_http_date_time(date_time)) return INVALID_DATE_TIME?;
+
+    int year = date_time[12..15].to_integer(uint)!;
+    String month_str = date_time[8..10];
+    Month month = match_month(month_str);
+    int day = date_time[5..6].to_integer(int)!;
+    int hour = date_time[17..18].to_integer(uint)!;
+    int min = date_time[20..21].to_integer(uint)!;
+    int sec = date_time[23..24].to_integer(uint)!;
+
+    return datetime::from_date(year, month, day, hour, min, sec);
+}
+
+fn bool validate_http_date_time(String date_time) => @pool()
 {
         // According to RFC 1123, the datetime is ALWAYS 29 characters in length,
         // e.g. Wed, 21 Oct 2015 07:28:00 GMT
@@ -102,12 +125,13 @@ fn bool? validate_http_date_time(String date_time) => @pool()
 
         String day = tnormalize_key(date_time[0..2]);
 
-        if (!get_week_days(tmem).contains(day)) return false;
+        if (!is_week_day(day)) return false;
         if (date_time[3] != ',') return false;
         if (date_time[4] != SP) return false;
 
         // Date: <day>-<month>-<year>
-        uint day_num = date_time[5..6].to_integer(uint)!;
+        uint? day_num = date_time[5..6].to_integer(uint);
+        if (catch excuse = day_num) return false;
         if (date_time[7] != '-') return false;
 
         String month_str = date_time[8..10];
@@ -118,17 +142,26 @@ fn bool? validate_http_date_time(String date_time) => @pool()
 
         if (date_time[11] != '-') return false;
 
-        uint year = date_time[13..15].to_integer(uint)!;
+        uint? year = date_time[12..15].to_integer(uint);
+        if (catch excuse = year) return false;
         if (date_time[16] != SP) return false;
 
         // 5. Time: <24-hour>:<minute>:<second>
-        if (date_time[17..18].to_integer(uint)! > 23) return false;
-        if (date_time[19] != ':') return false;
-        if (date_time[20..21].to_integer(uint)! > 59) return false;
-        if (date_time[22] != ':') return false;
-        if (date_time[23..24].to_integer(uint)! > 59) return false;
+        uint? hour = date_time[17..18].to_integer(uint);
+        if (catch excuse = hour) return false;
+        if (hour > 23) return false;
 
-        if (date_time[25] != SP) return false;
+        if (date_time[19] != ':') return false;
+
+        uint? min = date_time[20..21].to_integer(uint);
+        if (catch excuse = min) return false;
+        if (min > 59) return false;
+
+        if (date_time[22] != ':') return false;
+
+        uint? sec = date_time[23..24].to_integer(uint);
+        if (catch excuse = sec) return false;
+        if (sec > 59) return false;
 
         // Timezone can ONLY be GMT.
         if (date_time[26..28] != "GMT") return false;

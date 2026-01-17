@@ -1,5 +1,7 @@
 module req::http1;
 
+import std::time;
+
 fn void test_cookie_from_str() @test
 {
     Cookie cookie;
@@ -34,6 +36,13 @@ fn void test_cookie_multiple_values() @test
     test::eq(cookie.path, "/");
     test::eq(cookie.domain, ".google.ch");
     test::eq(cookie.expires_raw, "Wed, 23-Nov-2011 01:05:03 GMT");
+    test::eq(cookie.expires.month, Month.NOVEMBER);
+    test::eq(cookie.expires.day, 23);
+    test::eq(cookie.expires.weekday, Weekday.WEDNESDAY);
+    test::eq(cookie.expires.year, 2011);
+    test::eq(cookie.expires.hour, 1);
+    test::eq(cookie.expires.min, 5);
+    test::eq(cookie.expires.sec, 3);
     test::eq(cookie.max_age, 3600);
     test::@check(cookie.secure);
     test::@check(cookie.http_only);
