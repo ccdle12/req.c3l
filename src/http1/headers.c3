@@ -83,7 +83,6 @@ fn bool is_special_case_header_key(String key) => @pool()
     return special_cases.contains(key);
 }
 
-
 struct HttpHeaders
 {
     Allocator allocator;
@@ -186,6 +185,17 @@ fn void? HttpHeaders.enforce_content_length_special_case(&self, Header* header, 
     {
         return MALFORMED_DUPLICATE_CONTENT_LENGTH?;
     }
+}
+
+<*
+ foreach iterator for the headers.
+*>
+macro HttpHeaders.@each_header(&self; @body(key, value))
+{
+    self.headers.@each(; String key, Header header)
+    {
+        @body(key, header);
+    };
 }
 
 enum HeaderType
