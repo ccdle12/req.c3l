@@ -13,7 +13,7 @@ enum ChunkBodyParserState
     COMPLETE,
 }
 
-struct ChunkBodyParser (HttpStepParser)
+struct ChunkBodyParser (HttpResponseStepParser)
 {
     Allocator allocator;
     ChunkBodyParserState state;

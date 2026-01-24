@@ -11,7 +11,7 @@ enum StatusLineState
     COMPLETE,
 }
 
-struct StatusLineParser (HttpStepParser)
+struct StatusLineParser (HttpResponseStepParser)
 {
     Allocator allocator;
     StatusLineState state;

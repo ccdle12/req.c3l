@@ -2,7 +2,7 @@ module req::http1;
 
 import std::io;
 
-struct BodyParser (HttpStepParser)
+struct BodyParser (HttpResponseStepParser)
 {
     Allocator allocator;
     ChunkBodyParser chunk_body_parser;

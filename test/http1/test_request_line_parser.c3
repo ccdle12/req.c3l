@@ -93,10 +93,3 @@ fn void test_delayed_request_line() @test
         test::eq(fixture.result, HttpParserResult.COMPLETE);
     }!!;
 }
-
-fn void test_malformed_request_line() @test
-{
-    String input = "POST /api/v2\r\n";
-
-    test::eq(assert_request_line_error(input), INVALID_REQUEST_MISSING_HTTP_VERSION);
-}

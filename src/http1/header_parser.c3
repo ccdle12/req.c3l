@@ -11,7 +11,7 @@ enum HeaderState
     COMPLETE,
 }
 
-struct HeaderParser (HttpStepParser)
+struct HeaderParser (HttpResponseStepParser)
 {
     Allocator allocator;
     HeaderState state;

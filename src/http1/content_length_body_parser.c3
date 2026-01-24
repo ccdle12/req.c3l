@@ -6,7 +6,7 @@ enum ContentLengthBodyParserState
     COMPLETE,
 }
 
-struct ContentLengthBodyParser (HttpStepParser)
+struct ContentLengthBodyParser (HttpResponseStepParser)
 {
     ulong content_length_read;
     ContentLengthBodyParserState state;
