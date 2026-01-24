@@ -2,10 +2,20 @@ module req::http1;
 
 import std::collections::map;
 
+faultdef MALFORMED_HTTP_REQUEST;
+
 enum RequestType : (String name)
 {
     GET  = "GET",
     POST = "POST",
+}
+
+fn RequestType? request_type_from_string(String request_type) => @pool()
+{
+    if (tnormalize_key(RequestType.GET.name) == tnormalize_key(request_type))  return GET;
+    if (tnormalize_key(RequestType.POST.name) == tnormalize_key(request_type)) return POST;
+
+    return MALFORMED_HTTP_REQUEST?;
 }
 
 struct HttpRequest
@@ -15,6 +25,7 @@ struct HttpRequest
     // Request Line. e.g. GET /index.html HTTP/1.1
     RequestType type;
     String path;
+    String http_version;
 
     // e.g. Host: example.com
     String host;
@@ -46,7 +57,7 @@ fn String? HttpRequest.to_string(&self, Allocator allocator) => @pool()
     DString result;
     result.init(tmem);
 
-    result.appendf("%s %s HTTP/1.1\r\n", self.type.name, self.path);
+    result.appendf("%s %s %s\r\n", self.type.name, self.path, self.http_version);
     result.appendf("Host: %s\r\n", self.host);
 
     // TODO: If there are multiple values, I need to repeat the header?
@@ -72,6 +83,32 @@ fn void HttpRequest.free(&self)
 	if (!self.allocator) return;
 	self.path.free(self.allocator);
 	self.host.free(self.allocator);
+	self.http_version.free(self.allocator);
     self.headers.free();
 	self.body.free(self.allocator);
+}
+
+<*
+ @param [out] self
+*>
+fn void? HttpRequest.parse_http_request(&self, String request_type)
+{
+    RequestType type = request_type_from_string(request_type)!;
+    self.type = type;
+}
+
+<*
+ @param [out] self
+*>
+fn void HttpRequest.parse_path(&self, String path)
+{
+    self.path = path.copy(self.allocator);
+}
+
+<*
+ @param [out] self
+*>
+fn void HttpRequest.parse_http_version(&self, String http_version)
+{
+    self.http_version = http_version.copy(self.allocator);
 }

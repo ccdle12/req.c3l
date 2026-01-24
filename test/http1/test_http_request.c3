@@ -15,6 +15,7 @@ fn void test_request_init() @test
     request.type = RequestType.GET;
     request.path = "/search?name=John&age=30";
     request.host = "example.com";
+    request.http_version = "HTTP/1.1";
 
     // TODO: Is it ok to accept key normlization on output?
     request.headers.push("User-Agent", "Mozilla/5.0")!!;
@@ -44,6 +45,7 @@ fn void test_request_to_string_with_body() @test
     request.type = RequestType.POST;
     request.path = "/api/test";
     request.host = "example.com";
+    request.http_version = "HTTP/1.1";
 
     // TODO: Is it ok to accept key normlization on output?
     request.headers.push("User-Agent", "Mozilla/5.0")!!;
