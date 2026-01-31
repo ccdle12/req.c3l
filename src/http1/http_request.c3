@@ -112,3 +112,26 @@ fn void HttpRequest.parse_http_version(&self, String http_version)
 {
     self.http_version = http_version.copy(self.allocator);
 }
+
+<*
+ Parse a single header (key and raw value), enforce header-specific rules, and
+ either append its value to an existing header entry or copy the parsed header
+ into the response arena.
+ *>
+fn void? HttpRequest.parse_and_set_header(&self, String header_key, String header_value) => @pool()
+{
+    if (tnormalize_key(header_key) == SET_COOKIE)
+    {
+        self.headers.set_cookie(header_value)!;
+        return;
+    }
+
+    Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
+
+    // Cache the content length if applicable.
+    //self.try_cache_content_length(header)!;
+
+    // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
+    // Transfer Encoding has precendence over Content-Length.
+    //self.set_body_type();
+}
