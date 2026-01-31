@@ -36,7 +36,7 @@ fn void RequestLineParser.free(&self)
    self.http_version_cache.free();
 }
 
-fn HttpParserResult? RequestLineParser.step(&self, char byte, HttpRequest* http_request) @dynamic
+fn HttpParserResult? RequestLineParser.step(&self, char byte, HttpRequest* http_request)
 {
     switch(self.state)
     {
