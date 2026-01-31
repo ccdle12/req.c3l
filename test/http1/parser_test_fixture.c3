@@ -8,33 +8,16 @@ import std::io;
 *>
 struct ParserTestFixture
 {
-    HttpResponseStepParser parser;
+    // Any parser used in both HttpResponse and HttpRequest structs.
+    any parser;
     HttpResponse response;
     HttpParserResult result;
 }
 
-fn void ParserTestFixture.init(&self, HttpResponseStepParser parser)
+fn void ParserTestFixture.init(&self, any parser)
 {
     self.parser = parser;
     self.response.tinit();
-}
-
-<*
-  This helper function will drive the HttpResponseStepParser, advancing through the
-  state machine given input.
-*>
-fn HttpParserResult? ParserTestFixture.parse(&self, String input)
-{
-    io::ByteBuffer buf;
-    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
-    buf.write(input)!;
-
-    while (try byte = buf.read_byte())
-    {
-        self.result = self.parser.step(byte, &self.response)!;
-    }
-
-    return self.result;
 }
 
 <*
@@ -44,10 +27,10 @@ fn HttpParserResult? ParserTestFixture.parse(&self, String input)
   The function will setup all the required dependencies, execute the test assertions
   and return the results in the ParserTestFixture.
 *>
-macro void? @run_parser_test_fixture(String input, HttpResponseStepParser parser; @test_asserts(ParserTestFixture* fixture))
+macro void? @run_parser_test_fixture(String input, parser, parse_step_fn; @test_asserts(ParserTestFixture* fixture))
 {
     ParserTestFixture fixture;
-    fixture.init(parser);
-    fixture.parse(input)!;
+    fixture.init(&parser);
+    parse_step_fn(&fixture, input)!;
     @test_asserts(&fixture);
 }
