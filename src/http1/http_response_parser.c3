@@ -6,14 +6,6 @@ const usz MAX_SIZE = 4096;
 const usz INITIAL_CAPACITY = 4096;
 const usz CRLF_OFFSET = 2;
 
-faultdef MALFORMED_CRLF;
-
-enum HttpParserResult
-{
-    REQUEST_MORE,
-    COMPLETE,
-}
-
 interface HttpResponseStepParser
 {
     fn HttpParserResult? step(char byte, HttpResponse* http_response);
@@ -72,7 +64,7 @@ fn HttpParserResult? HttpResponseParser.step(&self, char[] input, HttpResponse* 
                 if (status_line == COMPLETE) self.state = HEADER;
 
             case HEADER:
-                HttpParserResult header = self.header_parser.step(byte, http_response)!;
+                HttpParserResult header = self.header_parser.@step(byte, http_response)!;
                 if (header == COMPLETE)
                 {
                     self.state = BODY;
