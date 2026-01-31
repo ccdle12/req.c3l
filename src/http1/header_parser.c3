@@ -11,7 +11,7 @@ enum HeaderState
     COMPLETE,
 }
 
-struct HeaderParser (HttpResponseStepParser)
+struct HeaderParser
 {
     Allocator allocator;
     HeaderState state;
@@ -35,8 +35,10 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response) @dynamic
+macro HttpParserResult? HeaderParser.@step(&self, char byte, http_request_or_response)
 {
+    $assert($defined(http_request_or_response.parse_and_set_header));
+
     switch(self.state)
     {
         case HEADER_KEY:
@@ -65,7 +67,7 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
                 String value = self.header_val_cache.str_view();
                 defer self.header_val_cache.clear();
 
-                response.parse_and_set_header(key, value)!;
+                http_request_or_response.parse_and_set_header(key, value)!;
 
                 self.state = HEADER_LF;
                 break;
