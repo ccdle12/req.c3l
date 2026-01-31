@@ -113,6 +113,8 @@ fn void HttpRequest.parse_http_version(&self, String http_version)
     self.http_version = http_version.copy(self.allocator);
 }
 
+// TODO: This is repeated in HttpResponse and HttpRequest, should it belong
+// to another struct/function?
 <*
  Parse a single header (key and raw value), enforce header-specific rules, and
  either append its value to an existing header entry or copy the parsed header
@@ -126,12 +128,5 @@ fn void? HttpRequest.parse_and_set_header(&self, String header_key, String heade
         return;
     }
 
-    Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
-
-    // Cache the content length if applicable.
-    //self.try_cache_content_length(header)!;
-
-    // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
-    // Transfer Encoding has precendence over Content-Length.
-    //self.set_body_type();
+    self.headers.push(header_key, header_value)!;
 }
