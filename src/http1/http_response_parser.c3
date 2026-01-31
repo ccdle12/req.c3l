@@ -6,10 +6,6 @@ const usz MAX_SIZE = 4096;
 const usz INITIAL_CAPACITY = 4096;
 const usz CRLF_OFFSET = 2;
 
-interface HttpResponseStepParser
-{
-    fn HttpParserResult? step(char byte, HttpResponse* http_response);
-}
 
 enum HttpResponseParserState
 {

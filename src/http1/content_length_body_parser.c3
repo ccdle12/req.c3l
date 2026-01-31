@@ -6,7 +6,7 @@ enum ContentLengthBodyParserState
     COMPLETE,
 }
 
-struct ContentLengthBodyParser (HttpResponseStepParser)
+struct ContentLengthBodyParser
 {
     ulong content_length_read;
     ContentLengthBodyParserState state;
@@ -18,7 +18,7 @@ fn void ContentLengthBodyParser.init(&self)
     self.state = READ_CONTENT;
 }
 
-fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
+fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse* http_response)
 {
     if (http_response.content_length == 0) return COMPLETE;
 

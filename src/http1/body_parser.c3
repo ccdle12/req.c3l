@@ -2,7 +2,7 @@ module req::http1;
 
 import std::io;
 
-struct BodyParser (HttpResponseStepParser)
+struct BodyParser
 {
     Allocator allocator;
     ChunkBodyParser chunk_body_parser;
@@ -16,7 +16,7 @@ fn void BodyParser.init(&self, Allocator allocator)
     self.content_length_body_parser.init();
 }
 
-fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
+fn HttpParserResult? BodyParser.step(&self, char byte, HttpResponse* http_response)
 {
     switch(http_response.body_type)
     {

@@ -13,7 +13,7 @@ enum ChunkBodyParserState
     COMPLETE,
 }
 
-struct ChunkBodyParser (HttpResponseStepParser)
+struct ChunkBodyParser
 {
     Allocator allocator;
     ChunkBodyParserState state;
@@ -36,7 +36,7 @@ fn void ChunkBodyParser.free(&self)
     self.extensions_cache.free();
 }
 
-fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
+fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_response)
 {
     switch(self.state)
     {
