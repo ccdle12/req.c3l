@@ -3,6 +3,22 @@ module req::http1;
 import std::io;
 import std::collections;
 
+fn HttpParserResult? chunk_body_parse_step(ParserTestFixture* fixture, String input)
+{
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
+
+    ChunkBodyParser* parser = (ChunkBodyParser*) fixture.parser;
+
+    while (try byte = buf.read_byte())
+    {
+        fixture.result = parser.step(byte, &fixture.response)!;
+    }
+
+    return fixture.result;
+}
+
 <*
   A test helper to setup the ParserTestFixture using the ChunkBodyParser for
   each test.
@@ -12,9 +28,9 @@ macro void? @run_chunk_body_parser_test(String input; @test_asserts(ParserTestFi
     ChunkBodyParser parser;
     parser.init(tmem);
 
-    @run_parser_test_fixture(input, &parser; ParserTestFixture* fixture)
+    @run_parser_test_fixture(input, parser, &chunk_body_parse_step; ParserTestFixture* fixture)
     {
-        @test_asserts(fixture, &parser);
+        @test_asserts(fixture, (ChunkBodyParser*) fixture.parser);
     }!;
 }
 
@@ -25,9 +41,9 @@ fn void test_chunk_body_hex_num() @test
     String input = "4\r\n";
     @run_chunk_body_parser_test(input; ParserTestFixture* fixture, ChunkBodyParser* parser)
     {
-        test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
-        test::eq(parser.chunk_size, 4);
-        test::eq(parser.state, ChunkBodyParserState.READ_CHUNK);
+       test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
+       test::eq(parser.chunk_size, 4);
+       test::eq(parser.state, ChunkBodyParserState.READ_CHUNK);
     }!!;
 }
 
@@ -43,7 +59,7 @@ fn void test_chunk_delayed_lf() @test
         test::eq(parser.state, ChunkBodyParserState.CHUNK_LF);
 
         String final_input = "\n";
-        test::eq(fixture.parse(final_input)!!, HttpParserResult.REQUEST_MORE);
+        test::eq(chunk_body_parse_step(fixture, final_input)!!, HttpParserResult.REQUEST_MORE);
 
         // The chunk should now be written in the response body.
         test::@check(fixture.response.body.str_view().contains("Wiki"));
@@ -67,7 +83,7 @@ fn void test_zero_hex_and_double_crlf() @test
         test::eq(parser.state, ChunkBodyParserState.DOUBLE_CR);
 
         String final_input = "\r\n";
-        test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
+        test::eq(chunk_body_parse_step(fixture, final_input)!!, HttpParserResult.COMPLETE);
         test::eq(parser.state, ChunkBodyParserState.COMPLETE);
     }!!;
 }
@@ -95,7 +111,7 @@ fn void test_multiple_body_chunks() @test
         String final_input =
             "0\r\n"
             "\r\n";
-        test::eq(fixture.parse(final_input)!!, HttpParserResult.COMPLETE);
+        test::eq(chunk_body_parse_step(fixture, final_input)!!, HttpParserResult.COMPLETE);
         test::eq(parser.state, ChunkBodyParserState.COMPLETE);
     }!!;
 }
