@@ -21,6 +21,7 @@ fn RequestType? request_type_from_string(String request_type) => @pool()
 struct HttpRequest
 {
     Allocator allocator;
+    DynamicArenaAllocator arena;
 
     // Request Line. e.g. GET /index.html HTTP/1.1
     RequestType type;
@@ -43,7 +44,9 @@ struct HttpRequest
 fn void HttpRequest.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
-    self.headers.init(self.allocator);
+    // TODO: 2026.02.04 - Update DEFAULT_PAGE_SIZE, if not allocating body here.
+    self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
+    self.headers.init(&self.arena);
 }
 
 fn void HttpRequest.tinit(&self) => self.init(tmem);
@@ -81,10 +84,7 @@ fn String? HttpRequest.to_string(&self, Allocator allocator) => @pool()
 fn void HttpRequest.free(&self)
 {
 	if (!self.allocator) return;
-	self.path.free(self.allocator);
-	self.host.free(self.allocator);
-	self.http_version.free(self.allocator);
-    self.headers.free();
+    self.arena.free();
 	self.body.free(self.allocator);
 }
 
@@ -100,9 +100,17 @@ fn void? HttpRequest.parse_http_request(&self, String request_type)
 <*
  @param [out] self
 *>
+fn void? HttpRequest.parse_host(&self, String host)
+{
+    self.host = host.copy(&self.arena).trim();
+}
+
+<*
+ @param [out] self
+*>
 fn void HttpRequest.parse_path(&self, String path)
 {
-    self.path = path.copy(self.allocator);
+    self.path = path.copy(&self.arena);
 }
 
 <*
@@ -110,7 +118,7 @@ fn void HttpRequest.parse_path(&self, String path)
 *>
 fn void HttpRequest.parse_http_version(&self, String http_version)
 {
-    self.http_version = http_version.copy(self.allocator);
+    self.http_version = http_version.copy(&self.arena);
 }
 
 // TODO: This is repeated in HttpResponse and HttpRequest, should it belong
