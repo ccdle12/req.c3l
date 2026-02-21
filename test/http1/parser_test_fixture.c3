@@ -3,7 +3,7 @@ module req::http1;
 import std::io;
 
 <*
-  This test fixture is used for all structs that implement HttpResponseStepParser. It
+  This test fixture is used for all structs that are Http Parsers. It
   will setup all the dependencies before each test and drive the results.
 *>
 struct ParserTestFixture

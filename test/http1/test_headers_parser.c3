@@ -3,8 +3,7 @@ module req::http1;
 import std::io;
 
 <*
-  This helper function will drive the HttpResponseStepParser, advancing through the
-  state machine given input.
+  The test function for header parser, it updates the fixture.
 *>
 fn HttpParserResult? header_parse_step(ParserTestFixture* fixture, String input)
 {
