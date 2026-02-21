@@ -2,18 +2,20 @@ module req::http1;
 
 import std::io;
 
+<*
+  The test function for content length parser, it updates the fixture.
+*>
 fn HttpParserResult? content_length_parse_step(ParserTestFixture* fixture, String input)
 {
     io::ByteBuffer buf;
     buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
     buf.write(input)!;
 
-    // I need this to be a solid type.
     ContentLengthBodyParser* parser = (ContentLengthBodyParser*) fixture.parser;
 
     while (try byte = buf.read_byte())
     {
-        fixture.result = parser.step(byte, &fixture.response)!;
+        fixture.result = parser.@step(byte, &fixture.response)!;
     }
 
     return fixture.result;
