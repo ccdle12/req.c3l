@@ -79,7 +79,7 @@ fn HttpParserResult? HttpResponseParser.step(&self, char[] input, HttpResponse* 
                 }
 
             case BODY:
-                HttpParserResult body = self.body_parser.step(byte, http_response)!;
+                HttpParserResult body = self.body_parser.@step(byte, http_response)!;
                 if (body == COMPLETE) return COMPLETE;
 
             case COMPLETE: return COMPLETE;
