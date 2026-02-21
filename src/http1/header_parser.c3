@@ -61,13 +61,26 @@ macro HttpParserResult? HeaderParser.@step(&self, char byte, http_request_or_res
             if (byte == LF) return MALFORMED_CRLF?;
             if (byte == CR)
             {
+                // TODO: If http_request_or_response is request:
+                // If header is Host, assign to host NOT push to headers.
                 String key = self.header_key_cache.str_view();
                 defer self.header_key_cache.clear();
 
                 String value = self.header_val_cache.str_view();
                 defer self.header_val_cache.clear();
 
-                http_request_or_response.parse_and_set_header(key, value)!;
+                // TODO: Push to headers, but if we have a http_request, which has "host", we need to assing the value there.
+                // TODO: Is there some logic where we can not push it to headers but just assign instead?
+                if (tnormalize_key(key) == "host")
+                {
+                    $if $defined(http_request_or_response.parse_host):
+                        http_request_or_response.parse_host(value)!;
+                    $endif
+                }
+                else
+                {
+                    http_request_or_response.parse_and_set_header(key, value)!;
+                }
 
                 self.state = HEADER_LF;
                 break;
