@@ -55,9 +55,15 @@ fn HttpParserResult? HttpRequestParser.step(&self, char[] input, HttpRequest* ht
                 if (request_line == COMPLETE) self.state = HEADER;
 
             case HEADER:
-                io::printfn("in header");
                 HttpParserResult header = self.header_parser.@step(byte, http_request)!;
                 if (header == COMPLETE)
+                {
+                    self.state = BODY;
+                }
+
+            case BODY:
+                HttpParserResult body = self.body_parser.@step(byte, http_request)!;
+                if (body == COMPLETE)
                 {
                     self.state = COMPLETE;
                     return COMPLETE;
