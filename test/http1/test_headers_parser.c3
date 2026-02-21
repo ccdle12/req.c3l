@@ -3,23 +3,30 @@ module req::http1;
 import std::io;
 
 <*
-  A test helper to setup the ParserTestFixture using the HeaderParser for
-  each test.
+  The test function for header parser, it updates the fixture.
 *>
-macro void? @run_header_parser_fixture(String input; @test_asserts(ParserTestFixture* fixture))
+fn HttpParserResult? header_parse_step(ParserTestFixture* fixture, String input)
 {
-    HeaderParser parser;
-    parser.init(tmem);
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
 
-    @run_parser_test_fixture(input, &parser; ParserTestFixture* fixture)
+    HeaderParser* parser = (HeaderParser*) fixture.parser;
+
+    while (try byte = buf.read_byte())
     {
-        @test_asserts(fixture);
-    }!;
+        fixture.result = parser.@step(byte, &fixture.response)!;
+    }
+
+    return fixture.result;
 }
 
 fn fault assert_header_parser_error(String input)
 {
-    return @catch(@run_header_parser_fixture(input; ParserTestFixture* fixture){});
+    HeaderParser parser;
+    parser.init(tmem);
+
+    return @catch(@run_parser_test_fixture(input, parser, &header_parse_step; ParserTestFixture* fixture){});
 }
 
 //// Test for RFC compliance. ////

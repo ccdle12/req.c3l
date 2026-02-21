@@ -2,6 +2,23 @@ module req::http1;
 
 import std::io;
 
+fn HttpParserResult? status_line_parse_step(ParserTestFixture* fixture, String input)
+{
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
+
+    // I need this to be a solid type.
+    StatusLineParser* parser = (StatusLineParser*) fixture.parser;
+
+    while (try byte = buf.read_byte())
+    {
+        fixture.result = parser.step(byte, &fixture.response)!;
+    }
+
+    return fixture.result;
+}
+
 <*
   A test helper to setup the ParserTestFixture using the StatusLineParser for
   each test.
@@ -11,7 +28,7 @@ macro void? @run_status_line_fixture(String input; @test_asserts(ParserTestFixtu
     StatusLineParser parser;
     parser.init(tmem);
 
-    @run_parser_test_fixture(input, &parser; ParserTestFixture* fixture)
+    @run_parser_test_fixture(input, parser, &status_line_parse_step; ParserTestFixture* fixture)
     {
         @test_asserts(fixture);
     }!;

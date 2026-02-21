@@ -43,10 +43,10 @@ fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
-    self.headers.init(self.allocator);
+    self.headers.init(&self.arena);
     self.content_length = 0;
-    self.body.init(self.allocator, MAX_SIZE);
-    self.extensions.init(self.allocator);
+    self.body.init(&self.arena, MAX_SIZE);
+    self.extensions.init(&self.arena);
 }
 
 fn void HttpResponse.tinit(&self) => self.init(tmem);
@@ -54,8 +54,6 @@ fn void HttpResponse.tinit(&self) => self.init(tmem);
 fn void HttpResponse.free(&self)
 {
     self.headers.free();
-    self.body.free();
-    self.extensions.free();
     self.arena.free();
 }
 

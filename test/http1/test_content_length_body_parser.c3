@@ -3,6 +3,25 @@ module req::http1;
 import std::io;
 
 <*
+  The test function for content length parser, it updates the fixture.
+*>
+fn HttpParserResult? content_length_parse_step(ParserTestFixture* fixture, String input)
+{
+    io::ByteBuffer buf;
+    buf.tinit(MAX_SIZE, INITIAL_CAPACITY);
+    buf.write(input)!;
+
+    ContentLengthBodyParser* parser = (ContentLengthBodyParser*) fixture.parser;
+
+    while (try byte = buf.read_byte())
+    {
+        fixture.result = parser.@step(byte, &fixture.response)!;
+    }
+
+    return fixture.result;
+}
+
+<*
   A test helper to setup the ParserTestFixture using the ContentLengthBodyParser for
   each test.
 *>
@@ -20,7 +39,8 @@ macro void? @run_content_length_body_parser_test(String input, ulong content_len
 
     fixture.response.parse_and_set_header(CONTENT_LENGTH_KEY, value.str_view())!!;
 
-    fixture.parse(input)!!;
+    content_length_parse_step(&fixture, input)!;
+
     @test_asserts(&fixture);
 }
 
@@ -61,19 +81,19 @@ fn void test_content_length_incremental_read() @test
         test::@check(fixture.response.body.str_view().contains(input_0));
 
         String input_1 = "\r\nThis";
-        test::eq(fixture.parse(input_1)!!, HttpParserResult.REQUEST_MORE);
+        test::eq(content_length_parse_step(fixture, input_1)!!, HttpParserResult.REQUEST_MORE);
         test::@check(fixture.response.body.str_view().contains(input_1));
 
         String input_2 = " is a\r\n";
-        test::eq(fixture.parse(input_2)!!, HttpParserResult.REQUEST_MORE);
+        test::eq(content_length_parse_step(fixture, input_2)!!, HttpParserResult.REQUEST_MORE);
         test::@check(fixture.response.body.str_view().contains(input_2));
 
         String input_3 = "multi-line";
-        test::eq(fixture.parse(input_3)!!, HttpParserResult.REQUEST_MORE);
+        test::eq(content_length_parse_step(fixture, input_3)!!, HttpParserResult.REQUEST_MORE);
         test::@check(fixture.response.body.str_view().contains(input_3));
 
         String input_4 = " body123";
-        test::eq(fixture.parse(input_4)!!, HttpParserResult.COMPLETE);
+        test::eq(content_length_parse_step(fixture, input_4)!!, HttpParserResult.COMPLETE);
         test::@check(fixture.response.body.str_view().contains(input_4));
     }!!;
 
