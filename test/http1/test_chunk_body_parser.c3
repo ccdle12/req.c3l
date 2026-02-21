@@ -13,7 +13,7 @@ fn HttpParserResult? chunk_body_parse_step(ParserTestFixture* fixture, String in
 
     while (try byte = buf.read_byte())
     {
-        fixture.result = parser.step(byte, &fixture.response)!;
+        fixture.result = parser.@step(byte, &fixture.response)!;
     }
 
     return fixture.result;
