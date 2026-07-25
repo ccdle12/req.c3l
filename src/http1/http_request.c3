@@ -69,7 +69,8 @@ fn String? HttpRequest.to_string(&self, Allocator allocator) => @pool()
     result.appendf("%s %s %s\r\n", self.type.name, self.path, self.http_version);
     result.appendf("Host: %s\r\n", self.host);
 
-    // TODO: If there are multiple values, I need to repeat the header?
+    // TODO: If there are multiple valus for the key, I think I need to be able to print
+    // the Key/Value like so: "Key: value, value, value, value"
     self.headers.@each_header(; String key, Header header)
     {
         if (header.values.len() == 1)
@@ -132,7 +133,7 @@ fn void HttpRequest.parse_http_version(&self, String http_version)
 }
 
 // TODO: This is repeated in HttpResponse and HttpRequest, should it belong
-// to another struct/function?
+// to another struct/function? Maybe I should just use an interface.
 <*
  Parse a single header (key and raw value), enforce header-specific rules, and
  either append its value to an existing header entry or copy the parsed header
