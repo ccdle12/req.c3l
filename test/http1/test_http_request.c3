@@ -13,8 +13,8 @@ fn void test_request_init() @test
 
     request.type = RequestType.GET;
     request.path = "/search?name=John&age=30";
-    request.host = "example.com";
     request.http_version = "HTTP/1.1";
+    request.host = "example.com";
 
     request.headers.push("User-Agent", "Mozilla/5.0")!!;
     request.headers.push("Accept", "application/json")!!;
@@ -42,8 +42,8 @@ fn void test_request_to_string_with_body() @test
 
     request.type = RequestType.POST;
     request.path = "/api/test";
-    request.host = "example.com";
     request.http_version = "HTTP/1.1";
+    request.host = "example.com";
 
     request.headers.push("User-Agent", "Mozilla/5.0")!!;
     request.headers.push("Content-Type", "application/json")!!;
@@ -79,8 +79,8 @@ fn void test_ser_der_http_request() @test
 
     request.type = RequestType.POST;
     request.path = "/api/test";
-    request.host = "example.com";
     request.http_version = "HTTP/1.1";
+    request.host = "example.com";
 
     request.headers.push("User-Agent", "Mozilla/5.0")!!;
     request.headers.push("Content-Type", "application/json")!!;
@@ -91,16 +91,18 @@ fn void test_ser_der_http_request() @test
                   "\t\"name\": \"John Doe\"\r\n"
                   "}\r\n";
 
+    // Assert the body is deserialized correctly.
     request.body.appendf("%s", body);
     test::eq(request.body.str_view(), body);
 
+    // Check that serializing to buffer was correct.
     String result = request.to_string(tmem)!!;
     char[] ser_str = (char[]) result;
 
-    // Check that serializing to buffer was correct.
     String der_str = (String) ser_str;
     test::eq(expected_str, der_str);
 
+    // Test that deserialiazing the HttpRequest is correct.
     HttpRequest der_request;
     der_request.tinit();
 
@@ -110,9 +112,24 @@ fn void test_ser_der_http_request() @test
 
     test::eq(request.type, der_request.type);
     test::eq(request.path, der_request.path);
-    test::eq(request.host, der_request.host);
     test::eq(request.http_version, der_request.http_version);
+    test::eq(request.host, der_request.host);
     test::eq(request.body, der_request.body);
 
-    // TODO: test eq for headers and extensions
+    // We know the that each header is a singleton so we will retrieve the values
+    // using the 0 index position. In most cases, the caller will need to check
+    // the HeaderType.
+    Header* user_agent = der_request.headers.get_ref(USER_AGENT_KEY)!!;
+    test::eq(user_agent.values[0], "Mozilla/5.0");
+
+    Header* content_type = der_request.headers.get_ref(CONTENT_TYPE_KEY)!!;
+    test::eq(content_type.values[0], "application/json");
+
+    Header* content_length = der_request.headers.get_ref(CONTENT_LENGTH_KEY)!!;
+    test::eq(content_length.values[0], "27");
+
+    Header* authorization = der_request.headers.get_ref(AUTHORIZATION_KEY)!!;
+    test::eq(authorization.values[0], "Bearer ACCESS_TOKEN");
+
+    // TODO: extensions
 }
