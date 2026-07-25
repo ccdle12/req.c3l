@@ -146,7 +146,6 @@ fn void? HttpRequest.parse_and_set_header(&self, String header_key, String heade
         return;
     }
 
-    //self.headers.push(header_key, header_value)!;
     Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
 
     // TODO: DUplicated from HttpResponse
@@ -199,3 +198,9 @@ fn void HttpRequest.parse_and_set_extensions(&self, String extensions) => @pool(
         self.extensions.set(key, value);
     };
 }
+
+<*
+ Helper function to get a Header.
+ @param [in] self
+ *>
+ fn Header*? HttpRequest.get_header_ref(&self, String key) => self.headers.get_ref(key);

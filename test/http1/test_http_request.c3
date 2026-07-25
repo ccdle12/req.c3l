@@ -119,17 +119,17 @@ fn void test_ser_der_http_request() @test
     // We know the that each header is a singleton so we will retrieve the values
     // using the 0 index position. In most cases, the caller will need to check
     // the HeaderType.
-    Header* user_agent = der_request.headers.get_ref(USER_AGENT_KEY)!!;
+    Header* user_agent = der_request.get_header_ref(USER_AGENT_KEY)!!;
     test::eq(user_agent.values[0], "Mozilla/5.0");
 
-    Header* content_type = der_request.headers.get_ref(CONTENT_TYPE_KEY)!!;
+    Header* content_type = der_request.get_header_ref(CONTENT_TYPE_KEY)!!;
     test::eq(content_type.values[0], "application/json");
 
-    Header* content_length = der_request.headers.get_ref(CONTENT_LENGTH_KEY)!!;
+    Header* content_length = der_request.get_header_ref(CONTENT_LENGTH_KEY)!!;
     test::eq(content_length.values[0], "27");
 
-    Header* authorization = der_request.headers.get_ref(AUTHORIZATION_KEY)!!;
+    Header* authorization = der_request.get_header_ref(AUTHORIZATION_KEY)!!;
     test::eq(authorization.values[0], "Bearer ACCESS_TOKEN");
 
-    // TODO: extensions
+    // TODO: extensions, move this to a test of a chunked body
 }
