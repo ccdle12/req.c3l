@@ -35,8 +35,13 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
+<*
+ @param byte : `A single byte for the header parser to parse.`
+ @param http_request_or_response : `Either an HttpRequest struct or HttpResponse struct.`
+*>
 macro HttpParserResult? HeaderParser.@step(&self, char byte, http_request_or_response)
 {
+    // Asserts that the HttpRequest and HttpResponse both have `parse_and_set_header()` implemented.
     $assert($defined(http_request_or_response.parse_and_set_header));
 
     switch(self.state)
