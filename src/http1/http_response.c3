@@ -135,3 +135,36 @@ fn void HttpResponse.set_body_type(&self)
 
 fn List{String}*? HttpResponse.get_header_ref(&self, String key) => &self.headers.get_ref(key)!.values;
 fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);
+
+// TODO: This is more or less the same with HttpRequest to_string().
+<*
+ @param [in] self
+ @param [inout] allocator : `the allocator that will own the new String.`
+ *>
+fn String? HttpResponse.to_string(&self, Allocator allocator) => @pool()
+{
+    DString result;
+    result.init(tmem);
+
+    result.appendf("%s %d %s\r\n", self.http_version, self.status_code, self.reason_phrase);
+
+    // TODO: If there are multiple valus for the key, I think I need to be able to print
+    // the Key/Value like so: "Key: value, value, value, value"
+    self.headers.@each_header(; String key, Header header)
+    {
+        if (header.values.len() == 1)
+        {
+            result.appendf("%s: %s\r\n", key, header.values.get(0));
+        }
+    };
+
+    // TODO: This doesn't handle chunked bodies?
+    // The double CRLF to separate the headers from the body.
+    result.append("\r\n");
+    if (self.body_type != NULL)
+    {
+        result.append(self.body);
+        result.append("\r\n");
+    }
+    return result.copy_str(allocator);
+}

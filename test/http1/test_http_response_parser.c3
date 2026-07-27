@@ -290,6 +290,35 @@ fn void test_empty_body_and_0_content_length() @test
     }!!;
 }
 
+fn void test_http_response_ser() @test
+{
+
+    String expected =
+      "HTTP/1.1 200 OK\r\n"
+      "access-control-allow-origin: *\r\n"
+      "content-type: application/json\r\n"
+      "date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
+      "vary: Accept-Encoding\r\n"
+      "via: 1.1 Caddy\r\n"
+      "\r\n";
+
+    HttpResponse response;
+    response.tinit();
+
+    response.http_version = "HTTP/1.1";
+    response.status_code = 200;
+    response.reason_phrase = "OK";
+
+    response.headers.push("access-control-allow-origin", "*")!!;
+    response.headers.push("content-type", "application/json")!!;
+    response.headers.push("Date", "Sat, 16 Aug 2025 21:48:49 GMT")!!;
+    response.headers.push("vary", "Accept-Encoding")!!;
+    response.headers.push("via", "1.1 Caddy")!!;
+
+    String result = response.to_string(tmem)!!;
+    test::eq(expected, result);
+}
+
 // TODO: This should be detected some how? the length of the long header
 // with multiple headers could be considered value.
 // Right now it returns MALFORMED_CRLF, I'm not the precise reason that is being
@@ -305,9 +334,12 @@ fn void test_empty_body_and_0_content_length() @test
 //        "Server: nginx/1.18.0 \r\n"
 //        "\r\n";
 //
-//    HttpParser parser;
+//    HttpResponseParser parser;
 //    parser.tinit();
 //
-//    fault excuse = @catch(parser.step(input));
+//   HttpResponse response;
+//   response.tinit();
+//
+//    fault excuse = @catch(parser.step(input, &response));
 //    test::eq(excuse, INVALID_HEADER_KEY_SYMBOL);
 //}
