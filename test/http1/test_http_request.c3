@@ -1,5 +1,8 @@
 module req::http1;
 
+import std::collections;
+import std::io;
+
 fn void test_request_init() @test
 {
     HttpRequest request;
@@ -130,6 +133,40 @@ fn void test_ser_der_http_request() @test
 
     Header* authorization = der_request.get_header_ref(AUTHORIZATION_KEY)!!;
     test::eq(authorization.values[0], "Bearer ACCESS_TOKEN");
+}
 
-    // TODO: extensions, move this to a test of a chunked body
+fn void test_ser_der_chunked_body_exts() @test
+{
+    String expected = "POST /api/test HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "user-agent: Mozilla/5.0\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "content-type: application/json\r\n"
+                      "authorization: Bearer ACCESS_TOKEN\r\n"
+                      "\r\n"
+                      "4;ext1=val1;flag\r\n"
+                      "Wiki\r\n"
+                      "5\r\n"
+                      "pedia\r\n"
+                      "E\r\n"
+                      " in\r\n"
+                      "\r\n"
+                      "chunks.\r\n"
+                      "0\r\n"
+                      "\r\n";
+
+    HttpRequest request;
+    request.tinit();
+
+    HttpRequestParser parser;
+    parser.tinit();
+
+    HttpParserResult result = parser.step(expected, &request)!!;
+    test::eq(parser.state, HttpRequestParserState.COMPLETE);
+    test::eq(result, HttpParserResult.COMPLETE);
+    test::eq(request.body_type, BodyType.CHUNKED);
+
+    HashMap{String, String}* map = &request.extensions;
+    test::@check(*map.get_ref("ext1")!! == "val1");
+    test::@check(*map.get_ref("flag")!! == "flag");
 }
