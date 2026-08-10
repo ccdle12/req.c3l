@@ -3,6 +3,9 @@ module req::http1;
 import std::io;
 import std::collections;
 
+<*
+ A test helper to step by string or single char in the fixture.
+*>
 fn HttpParserResult? chunk_body_parse_step(ParserTestFixture* fixture, String input)
 {
     io::ByteBuffer buf;
@@ -20,8 +23,8 @@ fn HttpParserResult? chunk_body_parse_step(ParserTestFixture* fixture, String in
 }
 
 <*
-  A test helper to setup the ParserTestFixture using the ChunkBodyParser for
-  each test.
+ A test helper to setup the ParserTestFixture using the ChunkBodyParser for
+ each test.
 *>
 macro void? @run_chunk_body_parser_test(String input; @test_asserts(ParserTestFixture* fixture, ChunkBodyParser* body_parser))
 {
@@ -58,6 +61,7 @@ fn void test_chunk_delayed_lf() @test
         test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
         test::eq(parser.state, ChunkBodyParserState.CHUNK_LF);
 
+        // Write the final lf, this should force the body to be updated containing the chunk.
         String final_input = "\n";
         test::eq(chunk_body_parse_step(fixture, final_input)!!, HttpParserResult.REQUEST_MORE);
 
