@@ -69,16 +69,21 @@ fn String? HttpRequest.to_string(&self, Allocator allocator) => @pool()
     result.appendf("%s %s %s\r\n", self.type.name, self.path, self.http_version);
     result.appendf("Host: %s\r\n", self.host);
 
-    // TODO: If there are multiple valus for the key, I think I need to be able to print
-    // the Key/Value like so: "Key: value, value, value, value"
     self.headers.@each_header(; String key, Header header)
     {
-        if (header.values.len() == 1)
+        result.appendf("%s: ", key);
+        foreach (idx, &value : header.values)
         {
-            result.appendf("%s: %s\r\n", key, header.values.get(0));
+            // For multiple values, append them as comma-separated values.
+            if (idx != header.values.len() - 1) {
+                result.appendf("%s, ", *value);
+            } else {
+                result.appendf("%s\r\n", *value);
+            }
         }
     };
 
+    // TODO: This doesn't handle chunked bodies?
     if (self.type == RequestType.POST)
     {
         // The double CRLF to separate the headers from the body.
