@@ -63,6 +63,47 @@ fn void test_request_to_string_with_body() @test
     test::eq(expected, result);
 }
 
+fn void test_request_to_string_with_multiple_headers() @test
+{
+    HttpRequest request;
+    request.tinit();
+
+    String expected = "POST /api/test HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "user-agent: Mozilla/5.0\r\n"
+                      "content-type: application/json\r\n"
+                      "content-length: 20\r\n"
+                      "authorization: Bearer ACCESS_TOKEN\r\n"
+                      "accept-encoding: gzip, deflate, br\r\n"
+                      "\r\n"
+                      "{\r\n"
+                      "\t\"name\": \"John Doe\"\r\n"
+                      "}\r\n"
+                      "\r\n";
+
+    request.type = RequestType.POST;
+    request.path = "/api/test";
+    request.http_version = "HTTP/1.1";
+    request.host = "example.com";
+
+    request.headers.push("User-Agent", "Mozilla/5.0")!!;
+    request.headers.push("Content-Type", "application/json")!!;
+    request.headers.push("Content-Length", "20")!!;
+    request.headers.push("Authorization", "Bearer ACCESS_TOKEN")!!;
+    request.headers.push("Accept-Encoding", "gzip")!!;
+    request.headers.push("Accept-Encoding", "deflate")!!;
+    request.headers.push("Accept-Encoding", "br")!!;
+
+    String body = "{\r\n"
+                  "\t\"name\": \"John Doe\"\r\n"
+                  "}\r\n";
+
+    request.body.appendf("%s", body);
+
+    String result = request.to_string(tmem)!!;
+    test::eq(expected, result);
+}
+
 fn void test_ser_der_http_request() @test
 {
     HttpRequest request;
@@ -135,7 +176,7 @@ fn void test_ser_der_http_request() @test
     test::eq(authorization.values[0], "Bearer ACCESS_TOKEN");
 }
 
-fn void test_ser_der_chunked_body_exts() @test
+fn void test_ser_chunked_body_exts() @test
 {
     String expected = "POST /api/test HTTP/1.1\r\n"
                       "Host: example.com\r\n"
