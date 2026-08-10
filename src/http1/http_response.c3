@@ -137,6 +137,7 @@ fn List{String}*? HttpResponse.get_header_ref(&self, String key) => &self.header
 fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);
 
 // TODO: This is more or less the same with HttpRequest to_string().
+// TODO: Make this a common function for HttpResponse and/or HttpRequest?
 <*
  @param [in] self
  @param [inout] allocator : `the allocator that will own the new String.`
@@ -152,9 +153,15 @@ fn String? HttpResponse.to_string(&self, Allocator allocator) => @pool()
     // the Key/Value like so: "Key: value, value, value, value"
     self.headers.@each_header(; String key, Header header)
     {
-        if (header.values.len() == 1)
+        result.appendf("%s: ", key);
+        foreach (idx, &value : header.values)
         {
-            result.appendf("%s: %s\r\n", key, header.values.get(0));
+            // For multiple values, append them as comma-separated values.
+            if (idx != header.values.len() - 1) {
+                result.appendf("%s, ", *value);
+            } else {
+                result.appendf("%s\r\n", *value);
+            }
         }
     };
 
