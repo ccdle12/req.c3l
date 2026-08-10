@@ -150,6 +150,34 @@ fn void test_full_header() @test
     }!!;
 }
 
+fn void test_multiple_header_values() @test
+{
+    String input =
+      "HTTP/1.1 200 OK\r\n"
+      "access-control-allow-origin: * \r\n"
+      "content-type: application/json \r\n"
+      "Date: Sat, 16 Aug 2025 21:48:49 GMT\r\n"
+      "vary: Accept-Encoding \r\n"
+      "via: 1.1 Caddy \r\n"
+      "transfer-encoding: chunked \r\n"
+      "accept-encoding: gzip, deflate, br\r\n";
+
+    @run_http_parser_test(input; HttpResponseParser* parser, HttpParserResult* result, HttpResponse* response)
+    {
+        test::eq(*result, HttpParserResult.REQUEST_MORE);
+        test::@check(parser.buf_str_view().contains(input));
+        test::eq((*response.get_header_ref("access-control-allow-origin")!!).get(0), "*");
+        test::eq((*response.get_header_ref("content-type")!!).get(0), "application/json");
+        test::eq((*response.get_header_ref("date")!!).get(0), "Sat, 16 Aug 2025 21:48:49 GMT");
+        test::eq((*response.get_header_ref("vary")!!).get(0), "Accept-Encoding");
+        test::eq((*response.get_header_ref("via")!!).get(0), "1.1 Caddy");
+        test::eq((*response.get_header_ref("transfer-encoding")!!).get(0), "chunked");
+        test::eq((*response.get_header_ref("accept-encoding")!!).get(0), "gzip");
+        test::eq((*response.get_header_ref("accept-encoding")!!).get(1), "deflate");
+        test::eq((*response.get_header_ref("accept-encoding")!!).get(2), "br");
+    }!!;
+}
+
 fn void test_headers_without_double_crlf() @test
 {
     String input =
@@ -292,7 +320,6 @@ fn void test_empty_body_and_0_content_length() @test
 
 fn void test_http_response_ser() @test
 {
-
     String expected =
       "HTTP/1.1 200 OK\r\n"
       "access-control-allow-origin: *\r\n"
