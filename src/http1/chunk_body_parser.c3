@@ -13,7 +13,7 @@ enum ChunkBodyParserState
     COMPLETE,
 }
 
-struct ChunkBodyParser (HttpStepParser)
+struct ChunkBodyParser
 {
     Allocator allocator;
     ChunkBodyParserState state;
@@ -36,8 +36,12 @@ fn void ChunkBodyParser.free(&self)
     self.extensions_cache.free();
 }
 
-fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
+macro HttpParserResult? ChunkBodyParser.@step(&self, char byte, http_request_or_response)
 {
+    // TODO: Could use an interface instead?
+    $assert($defined(http_request_or_response.append_to_body));
+    $assert($defined(http_request_or_response.parse_and_set_extensions));
+
     switch(self.state)
     {
         case HEX_NUM:
@@ -71,7 +75,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_r
         case READ_CHUNK:
             if (self.chunk_size > 0)
             {
-                http_response.append_to_body(byte);
+                http_request_or_response.append_to_body(byte);
                 self.chunk_size--;
                 break;
             }
@@ -89,7 +93,7 @@ fn HttpParserResult? ChunkBodyParser.step(&self, char byte, HttpResponse* http_r
         case EXTENSION:
             if (byte == CR)
             {
-                http_response.parse_and_set_extensions(self.extensions_cache.str_view());
+                http_request_or_response.parse_and_set_extensions(self.extensions_cache.str_view());
                 defer self.extensions_cache.clear();
 
                 self.state = HEX_LF;

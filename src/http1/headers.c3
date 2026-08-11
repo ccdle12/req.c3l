@@ -83,7 +83,6 @@ fn bool is_special_case_header_key(String key) => @pool()
     return special_cases.contains(key);
 }
 
-
 struct HttpHeaders
 {
     Allocator allocator;
@@ -117,6 +116,7 @@ fn bool HttpHeaders.has_key(&self, String key) => self.headers.has_key(key);
 
 fn Header*? HttpHeaders.push_and_get_header_ref(&self, String header_key, String header_value)
 {
+
     self.push(header_key, header_value)!;
     return self.get_ref(header_key);
 }
@@ -159,7 +159,15 @@ fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, 
 {
     Header header;
     header.init(allocator);
-    header.set_header(header_key, header_value)!;
+
+    // Handles the case of NOT splitting dates as they are first usually split with a comma, e.g. "Sat, Aug 10th 2026".
+    if (tnormalize_key(header_key) == DATE_KEY)
+    {
+        header.set_header(header_key, header_value)!;
+    } else {
+        String[] values = header_value.tsplit(",");
+        foreach (idx, &value : values) header.set_header(header_key, *value)!;
+    }
 
     self.enforce_duplicate_singleton_case(&header)!;
 
@@ -186,6 +194,17 @@ fn void? HttpHeaders.enforce_content_length_special_case(&self, Header* header, 
     {
         return MALFORMED_DUPLICATE_CONTENT_LENGTH?;
     }
+}
+
+<*
+ foreach iterator for the headers.
+*>
+macro HttpHeaders.@each_header(&self; @body(key, value))
+{
+    self.headers.@each(; String key, Header header)
+    {
+        @body(key, header);
+    };
 }
 
 enum HeaderType

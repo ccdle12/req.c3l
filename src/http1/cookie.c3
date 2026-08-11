@@ -56,7 +56,6 @@ struct Cookie
     // TODO: - Whats the difference between expires and max_age?
     String expires_raw;
     DateTime expires;
-    // TODO: - Create a date time object for expires.
 
     // The cookie must only be sent over HTTPS - optional.
     bool secure;
@@ -83,6 +82,17 @@ fn void Cookie.clear(&self)
     self.http_only = false;
     // TODO: Is this correct? - should I set a null variant?
     self.same_site = SameSite.LAX;
+}
+
+fn void Cookie.free(&self)
+{
+    self.clear();
+    if (!self.allocator) return;
+    self.name.free(self.allocator);
+    self.value.free(self.allocator);
+    self.domain.free(self.allocator);
+    self.path.free(self.allocator);
+    self.expires_raw.free(self.allocator);
 }
 
 fn void? Cookie.parse_str(&self, String value) => @pool()
@@ -151,7 +161,6 @@ fn void? Cookie.parse_str(&self, String value) => @pool()
             {
                 self.expires_raw = attr.trim().copy(self.allocator);
                 self.expires = parse_and_get_date_time(self.expires_raw) ?? MALFORMED_COOKIE_INVALID_EXPIRY_DATE?!;
-
             }
 
             if (tnormalize_key(key) == "max-age")

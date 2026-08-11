@@ -6,7 +6,7 @@ enum ContentLengthBodyParserState
     COMPLETE,
 }
 
-struct ContentLengthBodyParser (HttpStepParser)
+struct ContentLengthBodyParser
 {
     ulong content_length_read;
     ContentLengthBodyParserState state;
@@ -18,19 +18,22 @@ fn void ContentLengthBodyParser.init(&self)
     self.state = READ_CONTENT;
 }
 
-fn HttpParserResult? ContentLengthBodyParser.step(&self, char byte, HttpResponse* http_response) @dynamic
+macro HttpParserResult? ContentLengthBodyParser.@step(&self, char byte, http_request_or_response)
 {
-    if (http_response.content_length == 0) return COMPLETE;
+    $assert($defined(http_request_or_response.content_length));
+    $assert($defined(http_request_or_response.append_to_body));
+
+    if (http_request_or_response.content_length == 0) return COMPLETE;
 
     switch(self.state)
     {
         case READ_CONTENT:
-            if (self.content_length_read < http_response.content_length)
+            if (self.content_length_read < http_request_or_response.content_length)
             {
-                http_response.append_to_body(byte);
+                http_request_or_response.append_to_body(byte);
                 self.content_length_read++;
 
-                if (self.content_length_read == http_response.content_length)
+                if (self.content_length_read == http_request_or_response.content_length)
                 {
                     self.state = COMPLETE;
                     return COMPLETE;
