@@ -43,10 +43,10 @@ fn void HttpResponse.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.arena.init(self.allocator, DEFAULT_PAGE_SIZE);
-    self.headers.init(self.allocator);
+    self.headers.init(&self.arena);
     self.content_length = 0;
-    self.body.init(self.allocator, MAX_SIZE);
-    self.extensions.init(self.allocator);
+    self.body.init(&self.arena, MAX_SIZE);
+    self.extensions.init(&self.arena);
 }
 
 fn void HttpResponse.tinit(&self) => self.init(tmem);
@@ -54,8 +54,6 @@ fn void HttpResponse.tinit(&self) => self.init(tmem);
 fn void HttpResponse.free(&self)
 {
     self.headers.free();
-    self.body.free();
-    self.extensions.free();
     self.arena.free();
 }
 
@@ -137,3 +135,43 @@ fn void HttpResponse.set_body_type(&self)
 
 fn List{String}*? HttpResponse.get_header_ref(&self, String key) => &self.headers.get_ref(key)!.values;
 fn bool HttpResponse.has_content_length(&self) => self.headers.has_key(CONTENT_LENGTH_KEY);
+
+// TODO: This is more or less the same with HttpRequest to_string().
+// TODO: Make this a common function for HttpResponse and/or HttpRequest?
+<*
+ @param [in] self
+ @param [inout] allocator : `the allocator that will own the new String.`
+ *>
+fn String? HttpResponse.to_string(&self, Allocator allocator) => @pool()
+{
+    DString result;
+    result.init(tmem);
+
+    result.appendf("%s %d %s\r\n", self.http_version, self.status_code, self.reason_phrase);
+
+    // TODO: If there are multiple valus for the key, I think I need to be able to print
+    // the Key/Value like so: "Key: value, value, value, value"
+    self.headers.@each_header(; String key, Header header)
+    {
+        result.appendf("%s: ", key);
+        foreach (idx, &value : header.values)
+        {
+            // For multiple values, append them as comma-separated values.
+            if (idx != header.values.len() - 1) {
+                result.appendf("%s, ", *value);
+            } else {
+                result.appendf("%s\r\n", *value);
+            }
+        }
+    };
+
+    // TODO: This doesn't handle chunked bodies?
+    // The double CRLF to separate the headers from the body.
+    result.append("\r\n");
+    if (self.body_type != NULL)
+    {
+        result.append(self.body);
+        result.append("\r\n");
+    }
+    return result.copy_str(allocator);
+}

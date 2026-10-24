@@ -1,7 +1,5 @@
 module req::http1;
 
-import std::io;
-
 enum HeaderState
 {
     HEADER_KEY,
@@ -11,7 +9,7 @@ enum HeaderState
     COMPLETE,
 }
 
-struct HeaderParser (HttpStepParser)
+struct HeaderParser
 {
     Allocator allocator;
     HeaderState state;
@@ -35,8 +33,15 @@ fn void HeaderParser.free(&self)
    self.header_val_cache.free();
 }
 
-fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response) @dynamic
+<*
+ @param byte : `A single byte for the header parser to parse.`
+ @param http_request_or_response : `Either an HttpRequest struct or HttpResponse struct.`
+*>
+macro HttpParserResult? HeaderParser.@step(&self, char byte, http_request_or_response)
 {
+    // Asserts that the HttpRequest and HttpResponse both have `parse_and_set_header()` implemented.
+    $assert($defined(http_request_or_response.parse_and_set_header));
+
     switch(self.state)
     {
         case HEADER_KEY:
@@ -59,13 +64,26 @@ fn HttpParserResult? HeaderParser.step(&self, char byte, HttpResponse* response)
             if (byte == LF) return MALFORMED_CRLF?;
             if (byte == CR)
             {
+                // TODO: If http_request_or_response is request:
+                // If header is Host, assign to host NOT push to headers.
                 String key = self.header_key_cache.str_view();
                 defer self.header_key_cache.clear();
 
                 String value = self.header_val_cache.str_view();
                 defer self.header_val_cache.clear();
 
-                response.parse_and_set_header(key, value)!;
+                // TODO: Push to headers, but if we have a http_request, which has "host", we need to assing the value there.
+                // TODO: Is there some logic where we can not push it to headers but just assign instead?
+                if (tnormalize_key(key) == "host")
+                {
+                    $if $defined(http_request_or_response.parse_host):
+                        http_request_or_response.parse_host(value)!;
+                    $endif
+                }
+                else
+                {
+                    http_request_or_response.parse_and_set_header(key, value)!;
+                }
 
                 self.state = HEADER_LF;
                 break;

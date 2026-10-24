@@ -6,6 +6,14 @@ const char CR = '\r';
 const char LF = '\n';
 const char SP = ' ';
 
+faultdef MALFORMED_CRLF;
+
+enum HttpParserResult
+{
+    REQUEST_MORE,
+    COMPLETE,
+}
+
 <*
   Checks for valid characters allowed for HTTP Header keys.
 *>
