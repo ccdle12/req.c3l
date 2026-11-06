@@ -47,7 +47,7 @@ fn bool is_tchar(char c)
 *>
 fn void? assert_lf(char c)
 {
-    if (c != LF) return MALFORMED_CRLF?;
+    if (c != LF) return MALFORMED_CRLF~;
 }
 
 <*
@@ -55,7 +55,7 @@ fn void? assert_lf(char c)
 *>
 fn void? assert_cr(char c)
 {
-    if (c != CR) return MALFORMED_CRLF?;
+    if (c != CR) return MALFORMED_CRLF~;
 }
 
 fn String normalize_key(Allocator allocator, String key) => key.trim().to_lower_copy(allocator);

@@ -43,7 +43,7 @@ fn void test_cookie_multiple_values() @test
     test::eq(cookie.expires.hour, 1);
     test::eq(cookie.expires.min, 5);
     test::eq(cookie.expires.sec, 3);
-    test::eq(cookie.max_age, 3600);
+    test::eq(cookie.max_age, (uint) 3600);
     test::@check(cookie.secure);
     test::@check(cookie.http_only);
     test::eq(cookie.same_site, SameSite.STRICT);

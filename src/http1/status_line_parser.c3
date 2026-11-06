@@ -58,7 +58,7 @@ fn HttpParserResult? StatusLineParser.step(&self, char byte, HttpResponse* http_
             {
                 String status_code = self.status_code_cache.str_view();
                 defer self.status_code_cache.clear();
-                if (@catch(http_response.parse_status_code(status_code))) return INVALID_STATUS_CODE?;
+                if (@catch(http_response.parse_status_code(status_code))) return INVALID_STATUS_CODE~;
 
                 if (byte == CR) self.state = STATUS_LINE_LF;
                 if (byte == SP) self.state = OPTIONAL_REASON;

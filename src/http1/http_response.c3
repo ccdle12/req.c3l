@@ -59,13 +59,13 @@ fn void HttpResponse.free(&self)
 
 fn void? HttpResponse.parse_status_code(&self, String status_code)
 {
-    if (status_code.len > 3) return INVALID_STATUS_CODE?;
-    self.status_code = status_code.to_integer(int, 10)!;
+    if (status_code.len > 3) return INVALID_STATUS_CODE~;
+    self.status_code = string::to_integer{int}(status_code)!;
 }
 
 fn void? HttpResponse.parse_http_protocol(&self, String http_version)
 {
-    if (http_version != HTTP11 && http_version != HTTP10) return INVALID_PROTOCOL_VERSION?;
+    if (http_version != HTTP11 && http_version != HTTP10) return INVALID_PROTOCOL_VERSION~;
     self.http_version = http_version.copy(&self.arena);
 }
 
@@ -100,7 +100,7 @@ fn void? HttpResponse.parse_and_set_header(&self, String header_key, String head
     Header* header = self.headers.push_and_get_header_ref(header_key, header_value)!;
 
     // Cache the content length if applicable.
-    self.try_cache_content_length(header)!;
+    try_cache_content_length(self, header)!;
 
     // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
     // Transfer Encoding has precendence over Content-Length.
@@ -111,9 +111,12 @@ fn void? HttpResponse.parse_and_set_header(&self, String header_key, String head
  Caches the content length in th HttpResponse for quicker access if header is a
  `content-length`.
  *>
-fn void? HttpResponse.try_cache_content_length(&self, Header* header) @private
+fn void? try_cache_content_length(HttpResponse* self, Header* header) @private
 {
-    if (header.key == CONTENT_LENGTH_KEY) self.content_length = header.values.get(0).to_integer(ulong)!;
+    if (header.key == CONTENT_LENGTH_KEY)
+    {
+        self.content_length = string::to_integer{ulong}(header.values.get(0))!;
+    }
 }
 
 fn void HttpResponse.append_to_body(&self, char byte) => self.body.append_char(byte);

@@ -45,7 +45,7 @@ fn void test_chunk_body_hex_num() @test
     @run_chunk_body_parser_test(input; ParserTestFixture* fixture, ChunkBodyParser* parser)
     {
        test::eq(fixture.result, HttpParserResult.REQUEST_MORE);
-       test::eq(parser.chunk_size, 4);
+       test::eq(parser.chunk_size, (uint) 4);
        test::eq(parser.state, ChunkBodyParserState.READ_CHUNK);
     }!!;
 }

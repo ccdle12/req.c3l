@@ -16,9 +16,9 @@ This library will support:
 - Current c3c version:
 
 ```
-C3 Compiler Version:       0.7.8 (Pre-release, Dec 03 2025 13:47:36)
-Git Hash:                  ccffa03de29a531dbfbad69b977e8f96a6433733
-Backends:                  LLVM
+C3 Compiler Version:       0.8.6 (Pre-release, Nov 06 2026 20:06:06)
+Git Hash:                  8a2ac9601ba900a7639eb8a412fc3a9891304c1f
+Backends:                  LLVM; C
 LLVM version:              19.1.6
 ```
 

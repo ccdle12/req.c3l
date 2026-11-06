@@ -6,8 +6,8 @@ faultdef MALFORMED_HTTP_REQUEST;
 
 enum RequestType : (String name)
 {
-    GET  = "GET",
-    POST = "POST",
+    GET { "GET" },
+    POST { "POST" },
 }
 
 fn RequestType? request_type_from_string(String request_type) => @pool()
@@ -15,7 +15,7 @@ fn RequestType? request_type_from_string(String request_type) => @pool()
     if (tnormalize_key(RequestType.GET.name) == tnormalize_key(request_type))  return GET;
     if (tnormalize_key(RequestType.POST.name) == tnormalize_key(request_type)) return POST;
 
-    return MALFORMED_HTTP_REQUEST?;
+    return MALFORMED_HTTP_REQUEST~;
 }
 
 struct HttpRequest
@@ -156,7 +156,7 @@ fn void? HttpRequest.parse_and_set_header(&self, String header_key, String heade
 
     // TODO: DUplicated from HttpResponse
     // Cache the content length if applicable.
-    self.try_cache_content_length(header)!;
+    try_cache_content_length_request(self, header)!;
 
     // Set body type as the headers arrive. We enforce RFC 9112 6.1 -
     // Transfer Encoding has precendence over Content-Length.
@@ -168,9 +168,12 @@ fn void? HttpRequest.parse_and_set_header(&self, String header_key, String heade
  Caches the content length in th HttpResponse for quicker access if header is a
  `content-length`.
  *>
-fn void? HttpRequest.try_cache_content_length(&self, Header* header) @private
+fn void? try_cache_content_length_request(HttpRequest* self, Header* header) @private
 {
-    if (header.key == CONTENT_LENGTH_KEY) self.content_length = header.values.get(0).to_integer(ulong)!;
+    if (header.key == CONTENT_LENGTH_KEY)
+    {
+        self.content_length = string::to_integer{ulong}(header.values.get(0))!;
+    }
 }
 
 // TODO: DUplicated form HttpResponse

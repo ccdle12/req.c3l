@@ -104,17 +104,17 @@ faultdef INVALID_DATE_TIME;
 
 fn DateTime? parse_and_get_date_time(String date_time) => @pool()
 {
-    if (!validate_http_date_time(date_time)) return INVALID_DATE_TIME?;
+    if (!validate_http_date_time(date_time)) return INVALID_DATE_TIME~;
 
-    int year = date_time[12..15].to_integer(uint)!;
+    int year = string::to_integer{int}(date_time[12..15])!;
     String month_str = date_time[8..10];
     Month month = match_month(month_str);
-    int day = date_time[5..6].to_integer(int)!;
-    int hour = date_time[17..18].to_integer(uint)!;
-    int min = date_time[20..21].to_integer(uint)!;
-    int sec = date_time[23..24].to_integer(uint)!;
+    int day = string::to_integer{int}(date_time[5..6])!;
+    int hour = string::to_integer{int}(date_time[17..18])!;
+    int min = string::to_integer{int}(date_time[20..21])!;
+    int sec = string::to_integer{int}(date_time[23..24])!;
 
-    return datetime::from_date(year, month, day, hour, min, sec);
+    return datetime::at(year, month, day, hour, min, sec);
 }
 
 fn bool validate_http_date_time(String date_time) => @pool()
@@ -130,7 +130,7 @@ fn bool validate_http_date_time(String date_time) => @pool()
         if (date_time[4] != SP) return false;
 
         // Date: <day>-<month>-<year>
-        uint? day_num = date_time[5..6].to_integer(uint);
+        int? day_num = string::to_integer{int}(date_time[5..6]);
         if (catch excuse = day_num) return false;
         if (date_time[7] != '-') return false;
 
@@ -142,24 +142,24 @@ fn bool validate_http_date_time(String date_time) => @pool()
 
         if (date_time[11] != '-') return false;
 
-        uint? year = date_time[12..15].to_integer(uint);
+        int? year = string::to_integer{int}(date_time[12..15]);
         if (catch excuse = year) return false;
         if (date_time[16] != SP) return false;
 
         // 5. Time: <24-hour>:<minute>:<second>
-        uint? hour = date_time[17..18].to_integer(uint);
+        int? hour = string::to_integer{int}(date_time[17..18]);
         if (catch excuse = hour) return false;
         if (hour > 23) return false;
 
         if (date_time[19] != ':') return false;
 
-        uint? min = date_time[20..21].to_integer(uint);
+        int? min = string::to_integer{int}(date_time[20..21]);
         if (catch excuse = min) return false;
         if (min > 59) return false;
 
         if (date_time[22] != ':') return false;
 
-        uint? sec = date_time[23..24].to_integer(uint);
+        int? sec = string::to_integer{int}(date_time[23..24]);
         if (catch excuse = sec) return false;
         if (sec > 59) return false;
 
