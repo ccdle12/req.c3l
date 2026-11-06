@@ -140,7 +140,7 @@ fn void? HttpHeaders.push(&self, String header_key, String header_value) => @poo
     if (try cached_header = self.headers.get_ref(header.key))
     {
         // Enforcement of duplicate header value MUST use the pre-normalized header value.
-        self.enforce_content_length_special_case(cached_header, header_value)!;
+        enforce_content_length_special_case(cached_header, header_value)!;
 
         String additional_value = header.values.get(0).copy(&self.arena);
         cached_header.push_value(additional_value);
@@ -155,7 +155,7 @@ fn void? HttpHeaders.push(&self, String header_key, String header_value) => @poo
 <*
  Creates a new header while validating the header rules on header types (e.g. SINGLETON etc...).
  *>
-fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, String header_key, String header_value) @private
+fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, String header_key, String header_value)
 {
     Header header;
     header.init(allocator);
@@ -169,7 +169,7 @@ fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, 
         foreach (idx, &value : values) header.set_header(header_key, *value)!;
     }
 
-    self.enforce_duplicate_singleton_case(&header)!;
+    enforce_duplicate_singleton_case(self, &header)!;
 
     return header;
 }
@@ -179,20 +179,20 @@ fn Header? HttpHeaders.new_header_and_enforce_rules(&self, Allocator allocator, 
  and related header field definitions — duplicate instances of headers that are not allowed to appear
  multiple times should be treated as malformed.
  *>
-fn void? HttpHeaders.enforce_duplicate_singleton_case(&self, Header* header) @private
+fn void? enforce_duplicate_singleton_case(HttpHeaders* self, Header* header) @private
 {
-    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON?;
+    if (header.type == SINGLETON && self.headers.has_key(header.key)) return MALFORMED_HEADER_DUPLICATE_SINGLETON~;
 }
 
 <*
  Validate duplicate Content-Length header values per RFC 9112 section 6.3 (and RFC 7230 §3.3.2 behavior),
  ensuring multiple Content-Length headers are either identical or rejected.
 *>
-fn void? HttpHeaders.enforce_content_length_special_case(&self, Header* header, String pre_normalized_value) @private
+fn void? enforce_content_length_special_case(Header* header, String pre_normalized_value) @private
 {
     if (header.key == CONTENT_LENGTH_KEY && pre_normalized_value != header.values.get(0))
     {
-        return MALFORMED_DUPLICATE_CONTENT_LENGTH?;
+        return MALFORMED_DUPLICATE_CONTENT_LENGTH~;
     }
 }
 
@@ -247,11 +247,11 @@ fn void Header.init(&self, Allocator allocator)
 
 fn void? Header.validate_header_key(&self, String key)
 {
-    if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE?;
+    if (key[key.len - 1] == SP) return INVALID_TRAILING_SPACE~;
 
     foreach(c : key)
     {
-        if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL?;
+        if (!is_tchar(c)) return INVALID_HEADER_KEY_SYMBOL~;
     }
 }
 

@@ -61,7 +61,7 @@ macro HttpParserResult? HeaderParser.@step(&self, char byte, http_request_or_res
 
         case HEADER_VALUE:
             // Handle incorrect ordering of CRLF.
-            if (byte == LF) return MALFORMED_CRLF?;
+            if (byte == LF) return MALFORMED_CRLF~;
             if (byte == CR)
             {
                 // TODO: If http_request_or_response is request:

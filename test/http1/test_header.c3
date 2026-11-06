@@ -58,7 +58,7 @@ fn void test_set_cookie() @test
     test::eq(cookie.path, "/");
     test::eq(cookie.domain, ".google.ch");
     test::eq(cookie.http_only, true);
-    test::eq(cookie.max_age, 3600);
+    test::eq(cookie.max_age, (uint) 3600);
     test::eq(cookie.secure, true);
     test::eq(cookie.same_site, SameSite.STRICT);
 
@@ -70,7 +70,7 @@ fn void test_set_cookie() @test
     test::eq(updated_cookie.path, "");
     test::eq(updated_cookie.domain, "");
     test::eq(updated_cookie.http_only, false);
-    test::eq(updated_cookie.max_age, 0);
+    test::eq(updated_cookie.max_age, (uint) 0);
     test::eq(updated_cookie.secure, false);
     test::eq(updated_cookie.same_site, SameSite.LAX);
 }
